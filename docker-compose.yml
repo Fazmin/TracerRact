@@ -1,0 +1,17 @@
+name: ip-asset-explorer
+
+services:
+  explorer:
+    build: .
+    image: ip-asset-explorer:latest
+    ports:
+      # Only this computer by default; start.sh --lan sets BIND=0.0.0.0.
+      - "${BIND:-127.0.0.1}:${PORT:-8080}:8000"
+    environment:
+      HOST_PORT: "${PORT:-8080}"
+    volumes:
+      - explorer-data:/data
+    restart: unless-stopped
+
+volumes:
+  explorer-data:
