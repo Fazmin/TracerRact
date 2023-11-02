@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and start IP Asset Explorer in Docker, then open it in your browser.
+# Build and start Asset Tracer in Docker, then open it in your browser.
 #
 #   ./start.sh              start (builds on first run) and open http://localhost:8080
 #   ./start.sh --port 9090  use another port
@@ -50,7 +50,7 @@ fi
 
 export PORT BIND
 if [ "$CMD" = stop ]; then
-  say "Stopping IP Asset Explorer..."
+  say "Stopping Asset Tracer..."
   docker compose down
   exit 0
 fi
@@ -90,7 +90,7 @@ lan_ip() {
 }
 
 echo
-printf '  \033[1mIP Asset Explorer is running.\033[0m\n\n'
+printf '  \033[1mAsset Tracer is running.\033[0m\n\n'
 printf '  Open:  \033[4m%s\033[0m\n' "$URL"
 if [ "$BIND" = 0.0.0.0 ]; then
   ip="$(lan_ip || true)"

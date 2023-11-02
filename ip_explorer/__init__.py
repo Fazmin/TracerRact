@@ -1,4 +1,4 @@
-"""IP Asset Explorer: BlueCat IPAM and runZero scan data, merged and searchable."""
+"""Asset Tracer: BlueCat IPAM and runZero scan data, merged and searchable."""
 import os
 
 from flask import Flask

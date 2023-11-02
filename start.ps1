@@ -1,4 +1,4 @@
-# Build and start IP Asset Explorer in Docker, then open it in your browser.
+# Build and start Asset Tracer in Docker, then open it in your browser.
 #
 #   .\start.cmd              start (builds on first run) and open http://localhost:8080
 #   .\start.cmd --port 9090  use another port
@@ -75,7 +75,7 @@ try {
     $env:PORT = $Port
     $env:BIND = $Bind
     if ($Cmd -eq 'stop') {
-        say 'Stopping IP Asset Explorer...'
+        say 'Stopping Asset Tracer...'
         docker compose down
         exit $LASTEXITCODE
     }
@@ -111,7 +111,7 @@ try {
     }
 
     Write-Host ''
-    Write-Host '  IP Asset Explorer is running.' -ForegroundColor White
+    Write-Host '  Asset Tracer is running.' -ForegroundColor White
     Write-Host ''
     Write-Host '  Open:  ' -NoNewline; Write-Host $Url -ForegroundColor Cyan
     if ($Bind -eq '0.0.0.0') {

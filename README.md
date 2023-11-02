@@ -1,6 +1,6 @@
-# IP Asset Explorer
+# Asset Tracer
 
-IP Asset Explorer merges BlueCat IPAM export with runZero scan results so you can search and filter every address by building, room, owner, device type, risk, open ports and more. It is a Flask app with a SQLite database and runs in Docker.
+Asset Tracer merges BlueCat IPAM export with runZero scan results so you can search and filter every address by building, room, owner, device type, risk, open ports and more. It is a Flask app with a SQLite database and runs in Docker.
 
 ## Install and run
 
@@ -15,7 +15,7 @@ The script:
 2. builds the image (about a minute the first time)
 3. prints the address and opens it in your browser: <http://localhost:8080>
 
-The first time, the explorer is empty. Click **Load runZero / BlueCat file** to upload your exports.
+The first time, Asset Tracer is empty. Click **Load runZero / BlueCat file** to upload your exports.
 
 | Command | What it does |
 |---|---|

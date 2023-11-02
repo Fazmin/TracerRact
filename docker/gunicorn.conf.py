@@ -27,4 +27,4 @@ def worker_exit(server, worker):
 
 def when_ready(server):
     port = os.environ.get('HOST_PORT', '8080')
-    server.log.info('IP Asset Explorer is ready. Open http://localhost:%s in your browser.', port)
+    server.log.info('Asset Tracer is ready. Open http://localhost:%s in your browser.', port)
