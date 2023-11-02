@@ -183,7 +183,7 @@ function openDrawer(id){api('/api/assets/'+id).then(function(d){
    (all.length?'<div class="sec"><details><summary>All '+all.length+' runZero fields for this asset</summary><div class="allf">'+dl(all)+'</div></details></div>':'');
   $('dr').hidden=false;$('ovl').hidden=false;$('dr').scrollTop=0;$('dr').dataset.open=id;
 }).catch(fail)}
-function closeAll(){$('dr').hidden=true;$('ovl').hidden=true;$('imp').hidden=true}
+function closeAll(){$('dr').hidden=true;$('ovl').hidden=true;$('imp').hidden=true;$('about').hidden=true}
 
 /* ---------- CSV export ---------- */
 function copyCsv(){
@@ -334,6 +334,7 @@ $('dens').addEventListener('click',function(){var on=$('dens').getAttribute('ari
 $('chtog').addEventListener('click',function(){SHOWCH=!SHOWCH;$('chtog').setAttribute('aria-pressed',String(SHOWCH));try{localStorage.setItem('ipx-charts',SHOWCH?'on':'off')}catch(e){}if(SHOWCH)render();else{renderCharts(null);setTop()}});
 $('sidetog').addEventListener('click',function(){$('side').classList.toggle('open')});
 $('theme').addEventListener('click',toggleTheme);
+$('aboutbtn').addEventListener('click',function(){$('about').hidden=false;$('ovl').hidden=false});
 if(DARKQ.addEventListener)DARKQ.addEventListener('change',syncTheme);
 syncTheme();
 window.addEventListener('resize',setTop);

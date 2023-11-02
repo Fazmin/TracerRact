@@ -1,0 +1,5 @@
+# Shell scripts run in bash and inside the Linux container, so they need LF line
+# endings even in a Windows checkout (a CRLF entrypoint.sh stops the container starting).
+*.sh text eol=lf
+# cmd.exe can misread batch files that have LF-only line endings.
+*.cmd text eol=crlf
