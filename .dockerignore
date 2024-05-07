@@ -1,0 +1,14 @@
+# Keep data exports and anything derived from them out of the image.
+*.csv
+*.sqlite
+*.sqlite-*
+*.json.gz
+IP Asset Explorer*.html
+instance
+tests
+.venv
+.pytest_cache
+**/__pycache__
+*.pyc
+start.sh
+README.md
