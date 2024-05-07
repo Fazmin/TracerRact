@@ -42,7 +42,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .top-row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
 h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em;white-space:nowrap}
 .srcs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
-.src{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);max-width:340px;min-width:0}
+.src{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);max-width:420px;min-width:0;white-space:nowrap}
 .src b{color:var(--ink);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .src i{width:8px;height:8px;border-radius:50%;flex:none}
 .sp{flex:1}
@@ -250,3 +250,28 @@ details summary{cursor:pointer;color:var(--accent);padding:4px 0}
 .main.loading{opacity:.55}
 .empty-db{max-width:640px;margin:60px auto;text-align:center;color:var(--muted)}
 .empty-db code{font-family:var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+
+/* light / dark toggle */
+.btn.icon{width:34px;padding:0;display:inline-grid;place-items:center}
+.btn.icon svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Desktop: the page fits the window. The filter rail and the main column fill the height under the
+   top bar; the table (or location cards) takes the space left under the KPIs and charts and scrolls
+   inside itself. On short windows the main column scrolls instead of squeezing the table. */
+@media (min-width:981px){
+  body{height:100vh;display:flex;flex-direction:column;overflow:hidden;padding-block-end:16px}
+  .top{flex:none}
+  .app{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch}
+  .side{position:static;max-height:none}
+  .main{display:flex;flex-direction:column;min-height:0;overflow:auto}
+  /* Sections keep their natural height; when they don't all fit, the column scrolls instead of
+     squashing them (the filter chips row would otherwise collapse under the KPI cards). */
+  .main>*{flex-shrink:0}
+  #vtable:not([hidden]){flex:1 1 0;min-height:240px;display:flex;flex-direction:column}
+  #vtable .tw{flex:1 1 0;min-height:0;max-height:none}
+  #vtable .pager{flex:none;padding-bottom:0}
+  #vloc:not([hidden]){flex:1 1 0;min-height:240px;overflow:auto}
+  /* With charts showing there is no room left for the table, so it gets the full column height
+     below them (--fullH is measured in app.js) and the column scrolls past the charts to it. */
+  .main.with-charts #vtable:not([hidden]),.main.with-charts #vloc:not([hidden]){flex:none;height:var(--fullH,600px)}
+}
