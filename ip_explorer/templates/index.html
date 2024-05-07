@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<script>try{var t=localStorage.getItem('ipx-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -17,6 +18,7 @@
     <div class="srcs" id="srcs"></div>
     <span class="sp"></span>
     <button class="btn" id="sidetog" type="button">Filters</button>
+    <button class="btn icon" id="theme" type="button" aria-label="Switch to dark mode" title="Switch to dark mode"></button>
     <button class="btn primary" id="load" type="button">Load runZero / BlueCat file</button>
   </div>
   <div class="tbar">
