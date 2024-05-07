@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IP Asset Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%237A003C'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+
+<div class="top" id="top">
+  <div class="top-row">
+    <h1>IP Asset Explorer</h1>
+    <div class="srcs" id="srcs"></div>
+    <span class="sp"></span>
+    <button class="btn" id="sidetog" type="button">Filters</button>
+    <button class="btn primary" id="load" type="button">Load runZero / BlueCat file</button>
+  </div>
+  <div class="tbar">
+    <label class="search" for="q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" autocomplete="off" aria-label="Search all assets" placeholder="Search anything: IP, hostname, MAC, room, owner, model, port…  or use  type:printer  room:241  -os:xerox  ip:130.113.3.0/24"></label>
+    <div class="seg" role="group" aria-label="View"><button type="button" data-view="table" aria-pressed="true">Table</button><button type="button" data-view="loc" aria-pressed="false">Locations</button></div>
+    <button class="btn" id="chtog" type="button" aria-pressed="true">Charts</button>
+    <button class="btn" id="reset" type="button">Reset all</button>
+  </div>
+  <p class="hint" id="hint">Try: <code>type:printer risk:high</code> <code>room:ITB</code> <code>port:3389</code> <code>-owner:parking</code> <code>ip:130.113.0.0/16</code> <code>cov:"runZero only"</code> <code>seen:&gt;90</code></p>
+</div>
+
+<div class="empty-db" id="emptydb" hidden>
+  <h2>No data loaded yet</h2>
+  <p>Upload a BlueCat export, a runZero asset export, or both. They are kept in the explorer's database, so you only upload again when you have newer exports.</p>
+  <button class="btn primary" id="load2" type="button">Load runZero / BlueCat file</button>
+</div>
+
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="Filters"><div class="side-h"><b>Filters</b><button class="btn sm" id="clr" type="button">Clear filters</button></div><div id="facs"></div></aside>
+  <main class="main" id="main">
+    <div class="chips" id="chips"></div>
+    <section class="kpis" id="kpis" aria-label="Summary"></section>
+    <section class="charts" id="charts" aria-label="Charts"></section>
+    <div class="vbar">
+      <h2 id="vt">Assets</h2>
+      <span class="sp"></span>
+      <div class="menu" id="colmenu-w"><button class="btn sm" id="colbtn" type="button" aria-expanded="false">Columns</button></div>
+      <button class="btn sm" id="dens" type="button" aria-pressed="false">Compact rows</button>
+      <button class="btn sm" id="copy" type="button">Copy filtered as CSV</button>
+      <button class="btn sm" id="download" type="button">Download CSV</button>
+    </div>
+    <div class="cp" id="cp"><p class="hint">Copying was blocked in this view. Select all below and copy it yourself.</p><textarea id="cpt" readonly></textarea></div>
+    <div id="vtable"><div class="tw" id="tw"><table id="tbl"><thead></thead><tbody></tbody></table><div class="empty" id="empty" hidden>No assets match these filters.</div></div><div class="pager" id="pager"></div></div>
+    <div id="vloc" hidden></div>
+  </main>
+</div>
+
+<div id="ovl" class="ov" hidden></div>
+<aside class="dr" id="dr" hidden aria-label="Asset detail"></aside>
+<div class="dlg" id="imp" role="dialog" aria-modal="true" aria-labelledby="imp-t" hidden>
+  <header><h2 id="imp-t">Load data</h2><ol class="steps" id="steps"></ol><button class="x" id="imp-x" type="button" aria-label="Close">×</button></header>
+  <div class="dlg-b" id="imp-b"></div>
+  <footer><button class="btn" id="imp-back" type="button">Back</button><span class="sp"></span><span id="imp-msg" class="dim"></span><button class="btn primary" id="imp-next" type="button">Next</button></footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

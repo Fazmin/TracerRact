@@ -1,0 +1,12 @@
+.venv/
+.pytest_cache/
+__pycache__/
+instance/
+*.sqlite
+*.sqlite-*
+
+# Data exports and files derived from them contain sensitive network data.
+/*.csv
+*.json.gz
+IP Asset Explorer*.html
+.DS_Store

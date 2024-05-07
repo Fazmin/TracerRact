@@ -1,0 +1,11 @@
+Parent Block,Subnet,Subnet Name,IP Address,Host Name,Address Name,MAC Address,Location,Owner,Room,State
+130.113.0.0/16,130.113.10.0/24,ITB - Information Technology Building,130.113.10.1,,,,,,,Gateway
+130.113.0.0/16,130.113.10.0/24,ITB - Information Technology Building,130.113.10.20,"printer1.example.ca [ external ] , printer1.example.ca [ internal ]",printer1.example.ca,,Main campus,Test Owner A,ITB 241,Static
+130.113.0.0/16,130.113.10.0/24,ITB - Information Technology Building,130.113.10.21,ws21.example.ca,ws21.example.ca,AA-BB-CC-00-00-21,,Test Owner A,ITB 241,DHCP Reserved
+130.113.0.0/16,130.113.10.0/24,ITB - Information Technology Building,130.113.10.22,ws22.example.ca,ws22.example.ca,AA-BB-CC-00-00-99,,Test Owner B,ITB-242,DHCP Reserved
+130.113.0.0/16,130.113.10.0/24,ITB - Information Technology Building,130.113.10.23,ws23.example.ca,ws23.example.ca,AA-BB-CC-00-00-99,,Test Owner B,ITB 242,DHCP Reserved
+130.113.0.0/16,130.113.20.0/24,JHE - John Hodgins Engineering Building,130.113.20.5,lab5.example.ca,lab5.example.ca,,,Test Owner C,302,Static
+130.113.0.0/16,130.113.20.0/24,JHE - John Hodgins Engineering Building,130.113.20.6,lab6.example.ca,lab6.example.ca,AA-BB-CC-00-00-06,,Test Owner C,302,Static
+130.113.0.0/16,130.113.20.0/24,JHE - John Hodgins Engineering Building,130.113.20.7,,,,,,,DHCP Free
+172.16.0.0/12,172.16.5.0/24,VPN Pool,172.16.5.10,vpn10.example.ca,,,,,,Static
+130.113.0.0/16,130.113.30.0/24,Spare Range,not-an-ip,bad.example.ca,,,,,,Static
