@@ -51,6 +51,30 @@ It asks for anything you didn't set, and for your password unless you set `BAM_P
 
 Owner and Room come from BlueCat user-defined fields named `Owner` and `Room`. If yours are named differently, change `UDF_OWNER` and `UDF_ROOM` at the top of the script.
 
+## IP Tracker
+
+The **IP Tracker** section (next to **Explorer** at the top) checks addresses on a schedule to see whether they are still in use. Add addresses in any of these ways:
+
+- Type or paste them on the Tracker page: single IPs, CIDR blocks (`130.113.10.0/24`) or ranges (`130.113.10.5-130.113.10.40`). Blocks skip their network and broadcast addresses. You can add up to 10,000 at a time.
+- In the Explorer, filter to the assets you want, for example `cov:"BlueCat only"`, and click **Track these IPs**.
+- Click **Track this IP** in an asset's detail panel.
+
+Each address is checked on the interval you pick: every 4, 8 or 12 hours, every day, every 3 days, every month (30 days) or every 2 months (60 days). A check pings the address with [fping](https://fping.org/). If there is no answer, it tries a TCP connection to ports 80, 443, 22, 445 and 3389. A connection or a refusal both count as alive, as with `nmap -sn`. Click an address to see its profile: uptime, last reply, a 180-day availability strip and recent checks.
+
+An address goes into the **Likely unused** bucket after 90 days without a reply. That means it hasn't answered since tracking started, or since its last reply. **Download CSV** exports any bucket.
+
+Checks run in the background for as long as the container runs. Tracked addresses and their history are kept in the same Docker volume as your uploads, so they survive restarts, and checks pick up where they left off.
+
+| Environment variable | What it does |
+|---|---|
+| `TRACKER=off` | Don't run checks |
+| `TRACKER_UNUSED_DAYS=90` | Days without a reply before an address counts as likely unused |
+| `TRACKER_TCP_PORTS=80,443,22,445,3389` | Ports tried when an address doesn't answer ping. Leave empty to use ping only |
+
+Things to know:
+- **Checks come from your computer.** The pings and connection attempts go out from the computer running Docker. Make sure that is allowed on your network before you track large ranges.
+- **Firewalls can make addresses look alive.** A firewall that answers with a refusal on behalf of addresses that aren't there makes them look alive. The tracker tests this at startup and once a day: it checks `192.0.2.1`, a reserved address that is never in use. If anything answers for it, the TCP check is turned off and the Tracker page shows a warning.
+
 ## Your data
 
 - **Uploads only.** Exports are never part of the app. Upload a runZero asset export, a BlueCat export, or both. An upload replaces the previous file of the same kind.
@@ -64,8 +88,11 @@ Owner and Room come from BlueCat user-defined fields named `Owner` and `Room`. I
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/flask --app ip_explorer init-db          # empty database in instance/explorer.sqlite
 .venv/bin/flask --app ip_explorer run --debug      # http://127.0.0.1:5000
+.venv/bin/flask --app ip_explorer tracker          # IP Tracker checks (gunicorn runs them itself in Docker)
 .venv/bin/pytest
 ```
+
+Without fping installed, the tracker uses only the TCP check.
 
 Developing against real data is optional. `init-db --bluecat PATH --runzero PATH` loads exports from anywhere on disk as built-in data. The import dialog's **Go back to the built-in** button then returns to them.
 

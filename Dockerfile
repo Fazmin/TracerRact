@@ -6,6 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
+
+# fping checks tracked IPs. The capability lets it send ICMP as the non-root user below.
+# (fping depends on libcap2-bin, so it stays installed.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fping libcap2-bin \
+    && setcap cap_net_raw+ep "$(command -v fping)" \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 

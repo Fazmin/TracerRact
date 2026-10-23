@@ -14,6 +14,7 @@
 <div class="top" id="top">
   <div class="top-row">
     <h1>IP Asset Explorer</h1>
+    <div class="seg" role="group" aria-label="Section"><button type="button" data-sect="exp" aria-pressed="true">Explorer</button><button type="button" data-sect="trk" aria-pressed="false">IP Tracker</button></div>
     <div class="srcs" id="srcs"></div>
     <span class="sp"></span>
     <button class="btn" id="sidetog" type="button">Filters</button>
@@ -48,6 +49,7 @@
       <span class="sp"></span>
       <div class="menu" id="colmenu-w"><button class="btn sm" id="colbtn" type="button" aria-expanded="false">Columns</button></div>
       <button class="btn sm" id="dens" type="button" aria-pressed="false">Compact rows</button>
+      <button class="btn sm" id="trkall" type="button">Track these IPs</button>
       <button class="btn sm" id="copy" type="button">Copy filtered as CSV</button>
       <button class="btn sm" id="download" type="button">Download CSV</button>
     </div>
@@ -55,6 +57,27 @@
     <div id="vtable"><div class="tw" id="tw"><table id="tbl"><thead></thead><tbody></tbody></table><div class="empty" id="empty" hidden>No assets match these filters.</div></div><div class="pager" id="pager"></div></div>
     <div id="vloc" hidden></div>
   </main>
+</div>
+
+<div class="trk" id="trk" hidden>
+  <div class="trk-st" id="trk-st"></div>
+  <section class="kpis" id="trk-kpis" aria-label="Tracked addresses by status"></section>
+  <section class="card trk-add" aria-labelledby="trk-add-t">
+    <h3 id="trk-add-t">Track addresses</h3>
+    <p>Enter IP addresses, CIDR blocks such as <code>130.113.10.0/24</code> or ranges such as <code>130.113.10.5-130.113.10.40</code>, separated by spaces or new lines. You can also filter the Explorer and click <b>Track these IPs</b>.</p>
+    <textarea id="trk-ips" rows="2" aria-label="Addresses to track" placeholder="130.113.10.20  130.113.12.0/28"></textarea>
+    <div class="trk-row"><label>Check <select class="inp" id="trk-every"></select></label><input class="inp" id="trk-label" type="text" maxlength="200" aria-label="Label" placeholder="Label (optional)"><button class="btn primary" id="trk-go" type="button">Start tracking</button><span class="dim" id="trk-addmsg"></span></div>
+  </section>
+  <div class="vbar">
+    <h2 id="trk-vt">Tracked addresses</h2>
+    <label class="search trk-search" for="trk-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="trk-q" type="search" autocomplete="off" aria-label="Filter tracked addresses" placeholder="Filter by IP, CIDR, host, room, owner or label"></label>
+    <span class="sp"></span>
+    <div class="trk-bulk" id="trk-bulk" hidden><b id="trk-nsel"></b><select class="inp sm" id="trk-bevery" aria-label="Interval for the selected addresses"></select><button class="btn sm" type="button" data-bulk="every">Set interval</button><button class="btn sm" type="button" data-bulk="check">Check now</button><button class="btn sm" type="button" data-bulk="pause">Pause</button><button class="btn sm" type="button" data-bulk="resume">Resume</button><button class="btn sm danger" type="button" data-bulk="remove">Stop tracking</button></div>
+    <button class="btn sm" id="trk-dl" type="button">Download CSV</button>
+  </div>
+  <div class="tw"><table id="trk-tbl"><thead></thead><tbody></tbody></table><div class="empty" id="trk-empty" hidden></div></div>
+  <div class="pager" id="trk-pager"></div>
 </div>
 
 <div id="ovl" class="ov" hidden></div>
@@ -68,8 +91,14 @@
   <header><h2 id="about-t">About</h2><span class="sp"></span><button class="x" type="button" data-close aria-label="Close">×</button></header>
   <div class="dlg-b">
     <p>IP Asset Explorer combines a BlueCat IPAM export with a runZero asset export, so you can search and filter every address by building, room, owner, device type, risk and open ports in one place.</p>
+    <p>The IP Tracker checks the addresses you choose on a schedule and lists the ones that have not answered for 90 days, so you can see which addresses may no longer be in use.</p>
     <p>Built by Fazmin Nizam. This is an experimental tool, so check anything important against BlueCat or runZero.</p>
   </div>
+</div>
+<div class="dlg sm" id="trkdlg" role="dialog" aria-modal="true" aria-labelledby="trkdlg-t" hidden>
+  <header><h2 id="trkdlg-t">Track these IPs</h2><span class="sp"></span><button class="x" type="button" data-close aria-label="Close">×</button></header>
+  <div class="dlg-b" id="trkdlg-b"></div>
+  <footer><span class="sp"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" id="trkdlg-go" type="button">Start tracking</button></footer>
 </div>
 <div class="toast" id="toast" role="status"></div>
 

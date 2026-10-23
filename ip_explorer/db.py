@@ -58,7 +58,15 @@ def has_data(db):
         return False
 
 
-TABLES = ['runzero_rows', 'bluecat_rows', 'source_files', 'asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
+def has_targets(db):
+    try:
+        return db.execute('SELECT 1 FROM track_targets LIMIT 1').fetchone() is not None
+    except sqlite3.OperationalError:
+        return False
+
+
+TABLES = ['track_checks', 'track_targets', 'tracker_state',
+          'runzero_rows', 'bluecat_rows', 'source_files', 'asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
 # Rebuilt from the source files on every import.
 MERGED_TABLES = ['asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
 # Bump when the merged tables or the merge change, so a database built by another version is
@@ -90,14 +98,15 @@ def init_schema(db, reset=False):
 @click.command('init-db')
 @click.option('--bluecat', type=click.Path(dir_okay=False), help='BlueCat export CSV to load as built-in data (default: SEED_BLUECAT).')
 @click.option('--runzero', type=click.Path(dir_okay=False), help='runZero asset CSV to load as built-in data (default: SEED_RUNZERO).')
-@click.option('--if-empty', is_flag=True, help='Do nothing when the database already has data.')
+@click.option('--if-empty', is_flag=True, help='Do nothing when the database already has data or tracked IPs.')
 @with_appcontext
 def init_db_command(bluecat, runzero, if_empty):
     """Reset the database, optionally loading CSVs as built-in data. Without CSVs it starts empty."""
     from . import store
 
     db = get_db()
-    if if_empty and has_data(db):
+    # Tracked IPs count as data: someone may use only the tracker, and this runs on every start.
+    if if_empty and (has_data(db) or has_targets(db)):
         click.echo('Database already has data; keeping it.')
         return
     bluecat = bluecat or current_app.config['SEED_BLUECAT']
