@@ -8,6 +8,7 @@ instance/
 # Data exports and files derived from them contain sensitive network data.
 /*.csv
 /scripts/*.csv
+/data/
 *.json.gz
 IP Asset Explorer*.html
 .DS_Store

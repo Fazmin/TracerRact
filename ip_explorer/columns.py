@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Callable
 
+from .merge import addresses
 from .util import iso_day
 
 
@@ -31,7 +32,7 @@ def _f(name):
 
 
 BASE_COLUMNS = [
-    Column('n', 'IP address', ('ip',), _f('ip'), 'a.n', 'num', default=True),
+    Column('n', 'IP address', ('ip', 'ipSrc'), _f('ip'), 'a.n', 'num', default=True),
     Column('host', 'Hostname', ('host',), _f('host'), 'a.host', default=True, wide=True),
     Column('bld', 'Building', ('bld', 'bldC'), _f('bld'), 'a.bld', default=True),
     Column('roomL', 'Room', ('room',), _f('room'), 'a.roomL', default=True),
@@ -43,6 +44,8 @@ BASE_COLUMNS = [
     Column('last', 'Last seen', ('last',), lambda r: iso_day(r['last']), 'a.last_ms', 'num', default=True),
     Column('cov', 'Coverage', ('cov',), _f('cov'), 'a.cov', default=True),
     Column('state', 'BlueCat state', ('state',), _f('state'), 'a.state', default=True),
+    Column('ips', 'All IP addresses', ('ip', 'scopeIps', 'ips2', 'bcIp', 'bcMore'), lambda r: ' '.join(addresses(r)),
+           None, wide=True),
     Column('mac', 'MAC', ('mac',), _f('mac'), 'a.mac'),
     Column('vendor', 'MAC vendor', ('vendor',), _f('vendor'), 'a.vendor'),
     Column('sub', 'Subnet', ('sub',), _f('sub'), 'a.sub'),

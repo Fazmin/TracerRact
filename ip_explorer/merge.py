@@ -1,7 +1,9 @@
 """Merging runZero assets with BlueCat addresses, and inferring building and room.
 
-A line-by-line port of merge() from the original single-file explorer. Records are plain dicts
-with the same keys the original JS used, so the browser code can render them unchanged.
+Started as a line-by-line port of merge() from the original single-file explorer. Records are plain
+dicts with the keys the original JS used, so the browser code can render them. Unlike the original,
+every address runZero lists for an asset (address, addresses_scope, addresses_extra) is used to
+match it to BlueCat, link further BlueCat addresses to it and place it in a subnet.
 """
 import re
 
@@ -101,6 +103,7 @@ def _unique(xs):
     return out
 
 
+_MATCH_STAT = {'IP': 'byIp', 'Scope IP': 'byScope', 'Extra IP': 'byExtra'}
 B1, B2 = ipn('130.113.0.0'), ipn('172.16.0.0')
 
 
@@ -115,16 +118,36 @@ def blk_of(n):
 
 
 def blank():
-    return {'id': 0, 'hasRz': False, 'hasBc': False, 'ip': '', 'n': -1, 'ips2': [], 'host': '', 'hosts': [], 'mac': '',
-            'macs': [], 'vendor': '', 'bcHost': '', 'an': '', 'owner': '', 'room': '', 'roomL': '', 'bldC': '', 'bld': '',
-            'bldSrc': '', 'sub': '', 'subName': '', 'parent': '', 'state': '', 'loc': '', 'type': '', 'cat': '', 'os': '',
-            'osv': '', 'hw': '', 'risk': '', 'alive': '', 'first': 0, 'last': 0, 'tcp': [], 'udp': [], 'proto': [],
-            'prod': [], 'tags': [], 'agent': '', 'det': '', 'eol': '', 'serial': '', 'vlan': '', 'func': '', 'crit': '',
-            'notes': '', 'cov': '', 'match': '', 'blk': '', 'raw': None, 'dup': False}
+    return {'id': 0, 'hasRz': False, 'hasBc': False, 'ip': '', 'n': -1, 'scopeIps': [], 'ips2': [], 'host': '', 'hosts': [],
+            'mac': '', 'macs': [], 'vendor': '', 'bcIp': '', 'bcHost': '', 'an': '', 'owner': '', 'room': '', 'roomL': '',
+            'bldC': '', 'bld': '', 'bldSrc': '', 'sub': '', 'subName': '', 'parent': '', 'state': '', 'loc': '', 'type': '',
+            'cat': '', 'os': '', 'osv': '', 'hw': '', 'risk': '', 'alive': '', 'first': 0, 'last': 0, 'tcp': [], 'udp': [],
+            'proto': [], 'prod': [], 'tags': [], 'agent': '', 'det': '', 'eol': '', 'serial': '', 'vlan': '', 'func': '',
+            'crit': '', 'notes': '', 'cov': '', 'match': '', 'blk': '', 'bcMore': [], 'ipSrc': '', 'raw': None,
+            'dup': False}
+
+
+def addresses(r):
+    """Every address of a record: runZero's primary, scope and extra IPs, then the BlueCat addresses it was matched to."""
+    return _unique([x for x in [r['ip'], *r['scopeIps'], *r['ips2'], r['bcIp'], *(b['ip'] for b in r['bcMore'])] if x])
+
+
+def _stand_in_ip(r):
+    """For a runZero asset with no address: its first other address (IPv4 preferred) and where that came from."""
+    cands = ([(x, 'Scope IP') for x in r['scopeIps']] + [(x, 'Extra IP') for x in r['ips2']]
+             + ([(r['bcIp'], 'BlueCat address')] if r['bcIp'] else []))
+    return next((c for c in cands if ipn(c[0]) >= 0), cands[0] if cands else ('', ''))
+
+
+def _linked(b, via):
+    """A further BlueCat address of a runZero asset, as the detail panel lists it."""
+    return {'ip': b['ip'], 'via': via, 'host': b['host'].split(', ')[0] or b['an'], 'sub': b['sub'],
+            'subName': b['subName'], 'owner': b['owner'], 'room': b['room'], 'state': b['state']}
 
 
 def _apply_bc(r, b):
     r['hasBc'] = True
+    r['bcIp'] = b['ip']
     r['bcHost'] = b['host']
     r['an'] = b['an']
     r['state'] = b['state']
@@ -148,8 +171,8 @@ def _apply_bc(r, b):
 def merge(bc_objs, rz_tb, col_map):
     """bc_objs: BlueCat dicts (see ingest.bluecat_from_table); rz_tb: parsed runZero table or None;
     col_map: runZero field -> column index. Returns (records, stats)."""
-    stats = {'rzRows': 0, 'byIp': 0, 'byExtra': 0, 'byMac': 0, 'rzOnly': 0, 'bcOnly': 0, 'noIp': 0, 'badIp': 0,
-             'dupIp': 0, 'noLoc': 0}
+    stats = {'rzRows': 0, 'byIp': 0, 'byScope': 0, 'byExtra': 0, 'byMac': 0, 'bcLinked': 0, 'rzOnly': 0, 'bcOnly': 0,
+             'noIp': 0, 'badIp': 0, 'dupIp': 0, 'noLoc': 0}
     subs, sub_list = set(), []
     for b in bc_objs:
         if b['sub'] and b['sub'] not in subs:
@@ -161,7 +184,7 @@ def merge(bc_objs, rz_tb, col_map):
     sub_list.sort(key=lambda s: s['size'])
 
     def sub_for(n):
-        return next((s for s in sub_list if s['lo'] <= n <= s['hi']), None)
+        return next((s for s in sub_list if s['lo'] <= n <= s['hi']), None) if n >= 0 else None
 
     bc_by_ip, bc_by_mac, used = {}, {}, set()
     for i, b in enumerate(bc_objs):
@@ -193,6 +216,7 @@ def merge(bc_objs, rz_tb, col_map):
                 seen_ip[r['ip']]['dup'] = True
             elif r['ip']:
                 seen_ip[r['ip']] = r
+            r['scopeIps'] = split_list(g('scopeIps'))
             r['ips2'] = split_list(g('ips2'))
             r['hosts'] = _unique(split_list(g('hosts')))
             r['host'] = g('host') or (r['hosts'][0] if r['hosts'] else '')
@@ -214,17 +238,24 @@ def merge(bc_objs, rz_tb, col_map):
                 r[k] = g(k)
             r['raw'] = {headers[c]: row[c] for c in range(len(headers)) if c < len(row) and row[c] != ''}
 
-            b, how = None, ''
-            if r['ip'] and r['ip'] in bc_by_ip:
-                b, how = bc_by_ip[r['ip']], 'IP'
-                stats['byIp'] += 1
-            if b is None:
-                for e in r['ips2']:
-                    if e in bc_by_ip:
-                        b, how = bc_by_ip[e], 'Extra IP'
-                        stats['byExtra'] += 1
-                        break
-            if b is None:
+            # Every address runZero lists can match. The first BlueCat hit (primary, then scope, then
+            # extra IPs) supplies room, owner and subnet; any further hits are linked to the same asset.
+            b, how, more, seen = None, '', [], set()
+            for via, ips in (('IP', [r['ip']]), ('Scope IP', r['scopeIps']), ('Extra IP', r['ips2'])):
+                for x in ips:
+                    i = bc_by_ip.get(x)
+                    if i is None or x in seen:
+                        continue
+                    seen.add(x)
+                    if b is None:
+                        b, how = i, via
+                    else:
+                        more.append(_linked(bc_objs[i], via))
+                        used.add(i)
+            if b is not None:
+                stats[_MATCH_STAT[how]] += 1
+                stats['bcLinked'] += len(more)
+            else:
                 for mac in r['macs']:
                     hits = bc_by_mac.get(norm_mac(mac))
                     if hits and len(hits) == 1:
@@ -234,10 +265,14 @@ def merge(bc_objs, rz_tb, col_map):
             if b is not None:
                 used.add(b)
                 _apply_bc(r, bc_objs[b])
-                r['match'], r['cov'] = how, 'Both'
+                r['match'], r['cov'], r['bcMore'] = how, 'Both', more
             else:
                 r['cov'] = 'runZero only'
                 stats['rzOnly'] += 1
+            if not r['ip']:
+                # Shown, sorted and grouped by its stand-in; ipSrc keeps where it came from for the detail panel.
+                r['ip'], r['ipSrc'] = _stand_in_ip(r)
+                r['n'] = ipn(r['ip'])
             recs.append(r)
 
     for i, b in enumerate(bc_objs):
@@ -258,8 +293,9 @@ def merge(bc_objs, rz_tb, col_map):
     for i, r in enumerate(recs):
         r['id'] = i
         r['blk'] = blk_of(r['n'])
-        if not r['sub'] and r['n'] >= 0:
-            s = sub_for(r['n'])
+        if not r['sub']:
+            # The first of the asset's addresses, primary IP first, that sits in a BlueCat subnet.
+            s = next(filter(None, (sub_for(ipn(x)) for x in addresses(r))), None)
             if s:
                 r['sub'], r['subName'], r['parent'] = s['cidr'], s['name'], s['parent']
         code, src = '', ''

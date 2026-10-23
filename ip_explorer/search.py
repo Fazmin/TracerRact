@@ -1,10 +1,12 @@
 """The search box syntax: free text, key:value, -key:value, CIDR / IP ranges and seen:<N>.
 
 Per-asset search strings are built once at import time (asset_search table); a query is compiled
-to a SQL condition over that table and the assets table.
+to a SQL condition over that table and the assets table. IP searches look at every address of an
+asset (merge.addresses), not only its primary IP.
 """
 import re
 
+from .merge import addresses
 from .util import cidr_range, ipn
 
 
@@ -18,7 +20,7 @@ def _tags(r):
 
 # key -> asset_search column; the column holds what that key searches.
 SEARCH_FIELDS = {
-    'ip': lambda r: r['ip'] + ' ' + _join(r['ips2']),
+    'ip': lambda r: _join(addresses(r)),
     'host': lambda r: r['host'] + ' ' + _join(r['hosts']),
     'mac': lambda r: _join(r['macs']) + ' ' + r['mac'],
     'room': lambda r: r['room'] + ' ' + r['roomL'],
@@ -31,7 +33,7 @@ SEARCH_FIELDS = {
     'risk': lambda r: r['risk'],
     'port': lambda r: _join(r['tcp'] + r['udp']),
     'tag': _tags,
-    'sub': lambda r: r['sub'] + ' ' + r['subName'],
+    'sub': lambda r: _join(x['sub'] + ' ' + x['subName'] for x in [r, *r['bcMore']]),
     'state': lambda r: r['state'],
     'cat': lambda r: r['cat'],
     'proto': lambda r: _join(r['proto']),
@@ -55,7 +57,8 @@ def haystack(r):
              r['vendor'], r['owner'], r['room'], r['roomL'], r['bld'], r['bldC'], r['sub'], r['subName'], r['state'],
              r['type'], r['cat'], r['os'], r['osv'], r['hw'], r['risk'], _join(r['tcp']), _join(r['udp']),
              _join(r['proto']), _join(r['prod']), _join(' '.join(t) for t in r['tags']), r['agent'], r['notes'],
-             r['serial'], r['cov']]
+             r['serial'], r['cov'], _join(r['scopeIps']), r['bcIp'],
+             _join(_join([b['ip'], b['host'], b['sub'], b['subName'], b['owner'], b['room'], b['state']]) for b in r['bcMore'])]
     raw = _join(r['raw'].values()) if r['raw'] else ''
     return ' '.join(parts).lower() + ' ' + raw.lower()
 
@@ -72,6 +75,7 @@ _QUOTES = re.compile(r'^"|"$')
 _SEEN = re.compile(r'([<>]?)(\d+)', re.ASCII)
 _CIDR = re.compile(r'\d+\.\d+\.\d+\.\d+/\d+', re.ASCII)
 _RANGE = re.compile(r'\d+\.\d+\.\d+\.\d+-\d+\.\d+\.\d+\.\d+', re.ASCII)
+_ANY_IP_IN = 'a.id IN (SELECT asset_id FROM asset_ips WHERE n BETWEEN ? AND ?)'
 
 
 def tokenize(q):
@@ -111,14 +115,14 @@ def compile_search(q):
         elif key in (None, 'ip') and _CIDR.fullmatch(val):
             cr = cidr_range(val)
             if cr:
-                sql = 'a.n BETWEEN ? AND ?'
+                sql = _ANY_IP_IN
                 params += [cr[0], cr[1]]
             else:
                 sql = '0'
         elif key in (None, 'ip') and _RANGE.fullmatch(val):
             lo, hi = (ipn(x) for x in val.split('-'))
             if lo >= 0 and hi >= 0:
-                sql = 'a.n BETWEEN ? AND ?'
+                sql = _ANY_IP_IN
                 params += [lo, hi]
             else:
                 sql = '0'

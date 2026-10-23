@@ -58,17 +58,33 @@ def has_data(db):
         return False
 
 
-TABLES = ['runzero_rows', 'bluecat_rows', 'source_files', 'asset_facets', 'asset_search', 'assets', 'meta']
+TABLES = ['runzero_rows', 'bluecat_rows', 'source_files', 'asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
+# Rebuilt from the source files on every import.
+MERGED_TABLES = ['asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
+# Bump when the merged tables or the merge change, so a database built by another version is
+# rebuilt from its source files on the next start.
+BUILD_VERSION = 2
+
+
+def _build_version(db):
+    return db.execute('PRAGMA user_version').fetchone()[0]
 
 
 def init_schema(db, reset=False):
-    """Create any missing tables; with reset, drop everything first."""
-    if reset:
-        for t in TABLES:
+    """Create any missing tables; with reset, drop everything first. A database built by another
+    version keeps its source files and has its merged tables recreated and rebuilt."""
+    if reset or _build_version(db) != BUILD_VERSION:
+        for t in TABLES if reset else MERGED_TABLES:
             db.execute(f'DROP TABLE IF EXISTS {t}')
     with current_app.open_resource('schema.sql') as f:
         db.executescript(f.read().decode('utf-8'))
     db.execute('PRAGMA journal_mode = WAL')
+    if _build_version(db) != BUILD_VERSION:
+        from . import store
+
+        with transaction(db):
+            store.upgrade(db)
+            db.execute(f'PRAGMA user_version = {BUILD_VERSION}')
 
 
 @click.command('init-db')

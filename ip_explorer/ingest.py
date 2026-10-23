@@ -36,7 +36,8 @@ def parse_csv(text):
 # runZero fields the explorer understands, with the header aliases that map to each one.
 RZF = [
     {'k': 'ip', 'l': 'IP address', 'a': ['address', 'ip', 'ipaddress', 'ipv4', 'ipv4address', 'primaryip'], 'req': 1},
-    {'k': 'ips2', 'l': 'Other IPs', 'a': ['addressesextra', 'extraaddresses', 'otheraddresses', 'additionaladdresses']},
+    {'k': 'scopeIps', 'l': 'Scope IPs', 'a': ['addressesscope', 'scopeaddresses']},
+    {'k': 'ips2', 'l': 'Extra IPs', 'a': ['addressesextra', 'extraaddresses', 'otheraddresses', 'additionaladdresses']},
     {'k': 'host', 'l': 'Hostname', 'a': ['hostname', 'name', 'dnsname', 'fqdn']},
     {'k': 'hosts', 'l': 'All hostnames', 'a': ['hostnames', 'allhostnames']},
     {'k': 'mac', 'l': 'MAC', 'a': ['newestmac', 'mac', 'macaddress', 'primarymac']},
