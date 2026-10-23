@@ -12,6 +12,8 @@ def create_app(test_config=None):
         SEED_BLUECAT=os.environ.get('SEED_BLUECAT') or None,
         SEED_RUNZERO=os.environ.get('SEED_RUNZERO') or None,
         MAX_CONTENT_LENGTH=200 * 1024 * 1024,
+        # Background IP tracker checks (scheduler.py); TRACKER=off turns them off.
+        TRACKER=(os.environ.get('TRACKER') or 'on').lower() not in ('off', '0', 'false', 'no'),
     )
     if test_config:
         app.config.update(test_config)
@@ -20,7 +22,8 @@ def create_app(test_config=None):
     app.json.sort_keys = False
     app.json.ensure_ascii = False
 
-    from . import db, routes
+    from . import db, routes, scheduler
     db.init_app(app)
+    app.cli.add_command(scheduler.tracker_command)
     app.register_blueprint(routes.bp)
     return app

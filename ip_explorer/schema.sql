@@ -80,3 +80,39 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- IP tracker (see tracker.py): addresses checked on a schedule. Times are Unix seconds (UTC).
+-- next_at 0 means check as soon as possible; last_* describe the latest check.
+CREATE TABLE IF NOT EXISTS track_targets (
+  id INTEGER PRIMARY KEY,
+  ip TEXT NOT NULL UNIQUE,
+  n INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  every INTEGER NOT NULL,
+  paused INTEGER NOT NULL DEFAULT 0,
+  added_at INTEGER NOT NULL,
+  next_at INTEGER NOT NULL DEFAULT 0,
+  last_at INTEGER, last_up INTEGER, last_up_at INTEGER, last_rtt REAL,
+  last_via TEXT NOT NULL DEFAULT '',
+  checks INTEGER NOT NULL DEFAULT 0,
+  ups INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_track_targets_due ON track_targets (paused, next_at);
+CREATE INDEX IF NOT EXISTS idx_track_targets_n ON track_targets (n);
+
+-- One row per check of a tracked address.
+CREATE TABLE IF NOT EXISTS track_checks (
+  target_id INTEGER NOT NULL REFERENCES track_targets (id) ON DELETE CASCADE,
+  at INTEGER NOT NULL,
+  up INTEGER NOT NULL,
+  rtt REAL,
+  via TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_track_checks_target ON track_checks (target_id, at);
+CREATE INDEX IF NOT EXISTS idx_track_checks_at ON track_checks (at);
+
+-- Scheduler lease and heartbeat, last cycle, scanner self-test (JSON values).
+CREATE TABLE IF NOT EXISTS tracker_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

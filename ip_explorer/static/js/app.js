@@ -169,17 +169,18 @@ function renderSrcs(){
    '<span class="src"><i style="background:var(--c-bc)"></i>BlueCat <b title="'+esc(bc?bc.name:'none')+'">'+esc(bc?bc.name:'none loaded')+'</b> '+fmt(META.bcCount)+' addresses</span>'+
    (st.rzRows?'<span class="src"><i style="background:var(--c-both)"></i>'+fmt(st.byIp+st.byScope+st.byExtra+st.byMac)+' matched</span>':'');
 }
-function showEmpty(){var e=!!META.empty;$('emptydb').hidden=!e;$('app').hidden=e;$('hint').hidden=e;document.querySelector('.tbar').hidden=e}
+function showEmpty(){if(SECTION==='trk')return;var e=!!META.empty;$('emptydb').hidden=!e;$('app').hidden=e;$('hint').hidden=e;document.querySelector('.tbar').hidden=e}
 
 /* ---------- drawer ---------- */
 function dl(pairs){return '<dl>'+pairs.filter(function(p){return p[1]!==''&&p[1]!=null}).map(function(p){return '<dt>'+esc(p[0])+'</dt><dd>'+(p[2]?p[1]:esc(p[1]))+'</dd>'}).join('')+'</dl>'}
-function openDrawer(id){api('/api/assets/'+id).then(function(d){
-  var r=d.asset,nb=d.neighbours,nbn=d.neighbourCount,same=d.sameSubnet;
+function openDrawer(id){Promise.all([api('/api/assets/'+id),trkMeta().catch(function(){return null})]).then(function(x){
+  var d=x[0],r=d.asset,nb=d.neighbours,nbn=d.neighbourCount,same=d.sameSubnet;
   var all=[];if(r.raw)Object.keys(r.raw).forEach(function(k){all.push([k,r.raw[k]])});
   $('dr').innerHTML='<div class="dr-h"><div><h2>'+esc(r.ip||'No IP address')+'</h2><p>'+esc(r.host||r.an||'Unnamed asset')+(r.type?' · '+esc(r.type):'')+'</p></div><button class="x" type="button" data-close="dr" aria-label="Close detail">×</button></div>'+
    '<div class="tags">'+pillCov(r.cov).replace('class="pill"','class="tag"')+(r.risk?'<span class="tag">Risk '+pillRisk(r.risk)+'</span>':'')+(r.alive?'<span class="tag">Alive: '+esc(r.alive)+'</span>':'')+(r.eol?'<span class="tag" style="color:var(--bad)">OS end-of-life '+esc(r.eol)+'</span>':'')+(r.match?'<span class="tag">Matched by '+esc(r.match)+'</span>':'')+(r.ipSrc?'<span class="tag">No runZero address</span>':'')+(r.dup?'<span class="tag" style="color:var(--bad)">Duplicate IP in runZero file</span>':'')+'</div>'+
    '<div class="sec"><h3>Addresses</h3>'+dl([['runZero address',r.hasRz?(r.ipSrc?'None. The IP shown is its first '+IPSRC[r.ipSrc]+'.':r.ip||'None'):''],['Scope IPs',r.scopeIps.join(', ')],['Extra IPs',r.ips2.join(', ')],['BlueCat address',r.bcIp],['Address block',r.blk]])+'</div>'+
    (r.bcMore.length?'<div class="sec"><h3>Other BlueCat addresses of this asset ('+r.bcMore.length+')</h3>'+dl(r.bcMore.map(function(b){return [b.ip,[b.via,b.host,b.subName||b.sub,b.room&&'Room '+b.room,b.owner,b.state].filter(Boolean).join(' · ')]}))+'</div>':'')+
+   trkAssetSec(r,d.tracking)+
    '<div class="sec"><h3>Location</h3>'+dl([['Building',r.bld],['Building source',r.bldSrc],['Room',r.room],['Owner',r.owner],['Subnet',r.sub?r.sub+(same?' ('+fmt(same)+' records)':''):''],['Subnet name',r.subName],['BlueCat state',r.state],['BlueCat location',r.loc]])+'</div>'+
    '<div class="sec"><h3>Identity</h3>'+dl([['Hostnames',r.hosts.join(', ')],['BlueCat name',r.an],['MAC',r.macs.length?r.macs.join(', '):r.mac],['MAC vendor',r.vendor],['Serial numbers',r.serial]])+'</div>'+
    (r.hasRz?'<div class="sec"><h3>runZero</h3>'+dl([['Type',r.type],['Category',r.cat],['OS',(r.os+' '+r.osv).trim()],['Hardware',r.hw],['First seen',isoDay(r.first)],['Last seen',isoDay(r.last)],['Detected by',r.det],['Scanned by',r.agent],['Functions',r.func],['VLAN',r.vlan],['Criticality',r.crit],['Comments',r.notes]])+'</div>'+
@@ -187,9 +188,9 @@ function openDrawer(id){api('/api/assets/'+id).then(function(d){
    '<div class="acts">'+(r.room?'<button class="btn sm" type="button" data-q="room" data-v="'+esc(r.roomL)+'">Filter to this room</button>':'')+'<button class="btn sm" type="button" data-q="bld" data-v="'+esc(r.bld)+'">Filter to this building</button>'+(r.sub?'<button class="btn sm" type="button" data-q="sub" data-v="'+esc(r.sub+'  '+r.subName)+'">Filter to this subnet</button>':'')+(r.type?'<button class="btn sm" type="button" data-q="type" data-v="'+esc(r.type)+'">Same device type</button>':'')+(r.owner?'<button class="btn sm" type="button" data-q="owner" data-v="'+esc(r.owner)+'">Same owner</button>':'')+'<button class="btn sm" type="button" data-cp="'+esc(r.ip)+'">Copy IP</button></div>'+
    (nbn?'<div class="sec"><h3>Other assets in '+esc(r.roomL)+' ('+nbn+')</h3><div class="nb">'+nb.map(function(x){return '<button type="button" data-open="'+x.id+'"><span class="mono">'+esc(x.ip)+'</span><span>'+esc(x.host||x.type||x.an||'')+'</span><span class="dim">'+esc(x.type||x.state||'')+'</span></button>'}).join('')+(nbn>nb.length?'<span class="dim" style="padding:3px 4px">+'+(nbn-nb.length)+' more, use the room filter</span>':'')+'</div></div>':'')+
    (all.length?'<div class="sec"><details><summary>All '+all.length+' runZero fields for this asset</summary><div class="allf">'+dl(all)+'</div></details></div>':'');
-  $('dr').hidden=false;$('ovl').hidden=false;$('dr').scrollTop=0;$('dr').dataset.open=id;
+  $('dr').hidden=false;$('ovl').hidden=false;$('dr').scrollTop=0;$('dr').dataset.asset=id;delete $('dr').dataset.tid;
 }).catch(fail)}
-function closeAll(){$('dr').hidden=true;$('ovl').hidden=true;$('imp').hidden=true;$('about').hidden=true}
+function closeAll(){$('dr').hidden=true;$('ovl').hidden=true;$('imp').hidden=true;$('about').hidden=true;$('trkdlg').hidden=true}
 
 /* ---------- CSV export ---------- */
 function copyCsv(){
@@ -211,7 +212,7 @@ function colMenu(){
 function afterRebuild(m,msg){
   setupMeta(m);
   Object.keys(SEL).forEach(function(k){SEL[k]=new Set()});SEARCH='';$('q').value='';SHOWN=PAGE;
-  closeAll();buildFacets();renderSrcs();showEmpty();if(!m.empty)render();toast(msg);
+  closeAll();buildFacets();renderSrcs();showEmpty();if(!m.empty)render();if(SECTION==='trk')trkLoad(true);toast(msg);
 }
 
 /* ---------- import dialog ---------- */
@@ -282,6 +283,173 @@ function applyImp(){IMP.busy=true;renderImp();
 function resetKind(kind){IMP.busy=true;renderImp();
   send('/api/import/reset/'+kind,'POST').then(function(m){IMP.busy=false;afterRebuild(m,'Back to the built-in '+(kind==='rz'?'runZero sample':'BlueCat export'))}).catch(impFail)}
 
+/* ---------- IP tracker ---------- */
+var SECTION='exp';
+var TRK={sum:null,rows:[],count:0,bucket:'',q:'',sort:{k:'ip',d:1},shown:200,sel:new Set(),seq:0,arm:null};
+function pad(n){return (n<10?'0':'')+n}
+function dayKey(x){return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())}
+function when(t){if(!t)return '';var d=new Date(t*1000);return dayKey(d)+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
+function ago(t){var s=Math.max(0,Date.now()/1000-t);return s<90?'just now':s<5400?Math.round(s/60)+' min ago':s<129600?Math.round(s/3600)+' h ago':fmt(Math.round(s/86400))+' days ago'}
+function rel(t,none){return t?'<span title="'+esc(when(t))+'">'+ago(t)+'</span>':'<span class="dim">'+none+'</span>'}
+function ms(v){return v==null?'':(v<10?v.toFixed(1):Math.round(v))+' ms'}
+function viaText(v){return v==='icmp'?'ping':String(v||'').replace('tcp/','TCP port ').replace(' refused',' (refused)')}
+function pillSt(s){return '<span class="pill"><span class="dot" style="background:var(--t-'+s+')"></span>'+esc(TRK.sum.statuses[s]||s)+'</span>'}
+function everyOpts(sel){return TRK.sum.intervals.map(function(i){return '<option value="'+i.k+'"'+(i.k===sel?' selected':'')+'>'+esc(i.l)+'</option>'}).join('')}
+function everyKey(secs){var m=TRK.sum.intervals.filter(function(i){return i.s===secs})[0];return m?m.k:''}
+function trkMeta(){return TRK.sum?Promise.resolve(TRK.sum):api('/api/tracker').then(function(s){TRK.sum=s;return s})}
+function trkParams(extra){
+  var p=new URLSearchParams();if(TRK.bucket)p.set('bucket',TRK.bucket);if(TRK.q)p.set('q',TRK.q);
+  p.set('sort',TRK.sort.k);p.set('dir',String(TRK.sort.d));Object.keys(extra||{}).forEach(function(k){p.set(k,extra[k])});return p.toString()}
+function trkLoad(quiet){
+  var my=++TRK.seq;
+  return Promise.all([api('/api/tracker'),api('/api/tracker/targets?'+trkParams({limit:TRK.shown}))]).then(function(d){
+    if(my!==TRK.seq)return;
+    TRK.sum=d[0];TRK.rows=d[1].rows;TRK.count=d[1].count;
+    var shown=new Set(TRK.rows.map(function(r){return r.id}));TRK.sel.forEach(function(id){if(!shown.has(id))TRK.sel.delete(id)});
+    trkRender();
+  }).catch(function(e){if(!quiet)fail(e)});
+}
+function trkStatus(s){
+  var hb=s.heartbeat,live=hb&&Date.now()/1000-hb<150,cy=s.cycle,st=s.selfTest||{},out=[],warn=[];
+  out.push('<span><span class="trk-dot'+(live?' on':'')+'"></span>'+(live?'Background checks are running':'Background checks are not running'+(hb?' (last active '+ago(hb)+')':''))+'</span>');
+  out.push('<span>Scanner: '+esc(s.scanner)+'</span>');
+  if(cy&&!cy.error)out.push('<span>Last run '+ago(cy.at)+': '+fmt(cy.checked)+' checked, '+fmt(cy.up)+' answered</span>');
+  if(s.counts.all&&s.nextAt!=null)out.push('<span>'+(s.nextAt<=Date.now()/1000?'Checks are due now':'Next check '+esc(when(s.nextAt)))+'</span>');
+  if(!hb)warn.push('Checks run in the background while the app runs in Docker. For local development, run <code>flask --app ip_explorer tracker</code> as well.');
+  if(cy&&cy.error)warn.push('<b>The last run failed:</b> '+esc(cy.error));
+  if(st.error)warn.push('<b>The scanner self-test failed:</b> '+esc(st.error));
+  if(st.tcp)warn.push('<b>The TCP check is off.</b> Connections to 192.0.2.1, an address that is never in use, succeed from here, so a TCP answer proves nothing. Only ping is used.');
+  if(st.icmp)warn.push('<b>Ping results are unreliable.</b> 192.0.2.1, an address that is never in use, answers ping from here, so addresses can look alive when they are not.');
+  return '<div class="trk-line">'+out.join('')+'</div>'+warn.map(function(w){return '<div class="warn">'+w+'</div>'}).join('');
+}
+var TKPI=[['','All tracked'],['up','Up'],['down','Down'],['unused','Likely unused'],['pending','Waiting for first check'],['paused','Paused']];
+function trkRender(){
+  var s=TRK.sum,c=s.counts;
+  $('trk-st').innerHTML=trkStatus(s);
+  $('trk-kpis').innerHTML=TKPI.map(function(k){var b=k[0];return '<button type="button" class="kpi trk-k" data-bucket="'+b+'" aria-pressed="'+(TRK.bucket===b)+'"><div class="v">'+(b?'<span class="dot" style="background:var(--t-'+b+')"></span>':'')+fmt(c[b||'all'])+'</div><div class="l">'+k[1]+(b==='unused'?' · no reply '+s.unusedDays+'+ days':'')+'</div></button>'}).join('');
+  if(!$('trk-every').options.length){$('trk-every').innerHTML=everyOpts(s.defaultEvery);$('trk-bevery').innerHTML=everyOpts(s.defaultEvery)}
+  $('trk-vt').textContent=(TRK.bucket?s.statuses[TRK.bucket]:'Tracked addresses')+' ('+fmt(TRK.count)+')';
+  trkTable();
+}
+var TCOLS=[['ip','IP address'],['status','Status'],['reply','Last reply'],['last','Last check'],['uptime','Uptime'],['','Recent checks'],['every','Every'],['host','Host'],['bld','Building'],['room','Room'],['owner','Owner'],['label','Label'],['added','Tracked since']];
+function ticks(x){return x?'<span class="ticks" title="Last '+x.length+' checks, oldest first">'+x.split('').map(function(c){return '<i class="'+(c==='1'?'u':'d')+'"></i>'}).join('')+'</span>':'<span class="dim">–</span>'}
+function trkTable(){
+  var rows=TRK.rows,all=rows.length>0&&rows.every(function(r){return TRK.sel.has(r.id)});
+  $('trk-tbl').tHead.innerHTML='<tr><th class="ck"><input type="checkbox" data-tsel="all" aria-label="Select all shown"'+(all?' checked':'')+'></th>'+TCOLS.map(function(c){return c[0]?'<th data-ts="'+c[0]+'" tabindex="0"'+(TRK.sort.k===c[0]?' aria-sort="'+(TRK.sort.d>0?'ascending':'descending')+'"':'')+'>'+c[1]+'</th>':'<th class="ns">'+c[1]+'</th>'}).join('')+'</tr>';
+  $('trk-tbl').tBodies[0].innerHTML=rows.map(function(r){var on=TRK.sel.has(r.id);
+    return '<tr data-tid="'+r.id+'"'+(on?' class="sel"':'')+'><td class="ck"><input type="checkbox" data-tsel="'+r.id+'" aria-label="Select '+esc(r.ip)+'"'+(on?' checked':'')+'></td>'+
+     '<td><span class="mono">'+esc(r.ip)+'</span></td><td>'+pillSt(r.status)+'</td><td>'+rel(r.lastUpAt,'never')+'</td>'+
+     '<td>'+rel(r.lastAt,'not yet')+(r.lastUp&&r.lastRtt!=null?' <span class="dim mono">'+ms(r.lastRtt)+'</span>':'')+'</td>'+
+     '<td class="mono">'+(r.checks?Math.round(r.ups/r.checks*100)+'%':'<span class="dim">–</span>')+'</td><td>'+ticks(r.recent)+'</td>'+
+     '<td>'+esc(r.everyLabel.replace(/^Every /,''))+'</td><td>'+dim(r.host)+'</td><td>'+dim(r.bld)+'</td><td>'+dim(r.room.replace(/^[^·]*· /,''))+'</td>'+
+     '<td>'+dim(r.owner)+'</td><td>'+dim(r.label)+'</td><td class="mono">'+esc(when(r.addedAt).slice(0,10))+'</td></tr>'}).join('');
+  var e=$('trk-empty');e.hidden=TRK.count>0;e.textContent=TRK.sum.counts.all?'No tracked addresses match.':'Nothing is tracked yet. Add addresses above, or filter the Explorer and click Track these IPs.';
+  var left=TRK.count-rows.length;
+  $('trk-pager').innerHTML=left>0?'<span>Showing '+fmt(rows.length)+' of '+fmt(TRK.count)+'</span><button class="btn sm" type="button" data-tpg="1">Show '+fmt(Math.min(PAGE,left))+' more</button><button class="btn sm" type="button" data-tpg="all">Show all</button>':'';
+  trkBulk();
+}
+function trkBulk(){$('trk-bulk').hidden=!TRK.sel.size;$('trk-nsel').textContent=fmt(TRK.sel.size)+' selected';trkDisarm()}
+function trkSelect(t){
+  var v=t.dataset.tsel;
+  if(v==='all'){TRK.rows.forEach(function(r){if(t.checked)TRK.sel.add(r.id);else TRK.sel.delete(r.id)});trkTable();return}
+  if(t.checked)TRK.sel.add(+v);else TRK.sel.delete(+v);
+  t.closest('tr').classList.toggle('sel',t.checked);
+  document.querySelector('[data-tsel="all"]').checked=TRK.rows.every(function(r){return TRK.sel.has(r.id)});trkBulk();
+}
+/* Removing asks for a second click on the same button instead of a browser confirm. */
+function arm(b,label){
+  if(TRK.arm===b){TRK.arm=null;return true}
+  trkDisarm();TRK.arm=b;b.dataset.txt=b.textContent;b.textContent=label;b.classList.add('armed');
+  setTimeout(function(){if(TRK.arm===b)trkDisarm()},4000);return false}
+function trkDisarm(){var b=TRK.arm;TRK.arm=null;if(b&&b.dataset.txt){b.textContent=b.dataset.txt;b.classList.remove('armed')}}
+function addMsg(d){return 'Now tracking '+fmt(d.added)+' new address'+(d.added===1?'':'es')+(d.existing?' ('+fmt(d.existing)+' already tracked)':'')+'.'+(d.added?' The first check runs within a minute.':'')}
+function checkMsg(d){return d.queued!=null?fmt(d.queued)+' addresses queued. They are checked within a minute.':fmt(d.checked)+' checked, '+fmt(d.up)+' answered'}
+function trkDone(msg){toast(msg);return trkLoad(true)}
+function trkBulkAct(b){
+  var ids=Array.from(TRK.sel),a=b.dataset.bulk;if(!ids.length)return;
+  if(a==='remove'){if(!arm(b,'Stop tracking '+fmt(ids.length)+' and delete their history?'))return;
+    send('/api/tracker/targets','DELETE',{ids:ids}).then(function(d){TRK.sel.clear();trkDone('Stopped tracking '+fmt(d.removed)+' addresses')}).catch(fail);return}
+  if(a==='check'){b.disabled=true;send('/api/tracker/check','POST',{ids:ids}).then(function(d){b.disabled=false;trkDone(checkMsg(d))}).catch(function(e){b.disabled=false;fail(e)});return}
+  var body={ids:ids};if(a==='every')body.every=$('trk-bevery').value;else body.paused=a==='pause';
+  send('/api/tracker/targets','PATCH',body).then(function(d){TRK.sel.clear();trkDone((a==='every'?'Interval changed for ':a==='pause'?'Paused ':'Resumed ')+fmt(d.updated)+' addresses')}).catch(fail);
+}
+function trkAdd(){
+  var ips=$('trk-ips').value.trim();if(!ips){$('trk-ips').focus();return}
+  $('trk-go').disabled=true;$('trk-addmsg').textContent='';
+  send('/api/tracker/targets','POST',{ips:ips,every:$('trk-every').value,label:$('trk-label').value}).then(function(d){
+    var bad=d.invalid||[];$('trk-go').disabled=false;$('trk-ips').value='';
+    $('trk-addmsg').textContent=addMsg(d)+(bad.length?' Skipped, not addresses: '+bad.slice(0,8).join(', ')+(bad.length>8?' and '+fmt(bad.length-8)+' more':'')+'.':'');
+    trkLoad(true);
+  }).catch(function(e){$('trk-go').disabled=false;$('trk-addmsg').textContent=e.message});
+}
+function strip(checks,days){
+  var by={},out=[],today=new Date();today.setHours(0,0,0,0);
+  checks.forEach(function(c){var k=dayKey(new Date(c[0]*1000)),o=by[k]||(by[k]={n:0,u:0});o.n++;o.u+=c[1]});
+  for(var i=days-1;i>=0;i--){var x=new Date(today);x.setDate(today.getDate()-i);var k=dayKey(x),o=by[k];
+    out.push('<i'+(o?' class="'+(o.u===o.n?'u':o.u?'m':'d')+'"':'')+' title="'+k+': '+(o?o.u+' of '+o.n+' checks answered':'not checked')+'"></i>')}
+  return '<div class="strip">'+out.join('')+'</div><div class="strip-x"><span>'+days+' days ago</span><span>Today</span></div>'+
+   '<div class="trk-lg"><span><i class="u"></i>Answered</span><span><i class="m"></i>Some checks answered</span><span><i class="d"></i>No answer</span><span><i></i>Not checked</span></div>';
+}
+function trkOpen(id){Promise.all([api('/api/tracker/targets/'+id),trkMeta()]).then(function(x){
+  var d=x[0],t=d.target,ch=d.checks,now=Date.now()/1000,since=t.lastUpAt||t.addedAt;
+  $('dr').innerHTML='<div class="dr-h"><div><h2>'+esc(t.ip)+'</h2><p>'+esc(t.host||t.label||'Not in the Explorer data')+(t.type?' · '+esc(t.type):'')+'</p></div><button class="x" type="button" data-close="dr" aria-label="Close detail">×</button></div>'+
+   '<div class="tags"><span class="tag">'+pillSt(t.status)+'</span><span class="tag">'+esc(t.everyLabel)+'</span>'+(t.checks?'<span class="tag">Answered '+fmt(t.ups)+' of '+fmt(t.checks)+' checks ('+Math.round(t.ups/t.checks*100)+'%)</span>':'')+(t.label?'<span class="tag">'+esc(t.label)+'</span>':'')+'</div>'+
+   (t.status==='unused'?'<div class="warn"><b>Likely unused.</b> It has not answered for '+fmt(Math.floor((now-since)/86400))+' days'+(t.lastUpAt?'':', since tracking started')+'. Check with its owner before you reclaim it.</div>':'')+
+   '<div class="sec"><h3>Availability, last '+d.days+' days</h3>'+strip(ch,d.days)+'</div>'+
+   '<div class="sec"><h3>Profile</h3>'+dl([['Tracked since',when(t.addedAt)],
+     ['Last reply',t.lastUpAt?when(t.lastUpAt)+' ('+ago(t.lastUpAt)+')':'None since tracking started'],
+     ['Last check',t.lastAt?when(t.lastAt)+' · '+(t.lastUp?'answered by '+viaText(t.lastVia)+(t.lastRtt!=null?' in '+ms(t.lastRtt):''):'no answer'):'Not checked yet'],
+     ['Next check',t.paused?'Paused':t.nextAt<=now?'Due now':when(t.nextAt)],
+     ['Likely unused from',t.unusedAt?when(t.unusedAt)+', unless it answers before then':'']])+'</div>'+
+   (t.assetId?'<div class="sec"><h3>In the Explorer</h3>'+dl([['Host',t.host],['Building',t.bld],['Room',t.room],['Owner',t.owner],['Device type',t.type],['BlueCat state',t.state],['Coverage',t.cov]])+'</div>':'')+
+   '<div class="sec"><h3>Settings</h3><div class="trk-row"><label>Check <select class="inp sm" data-tset="every">'+everyOpts(everyKey(t.every))+'</select></label><input class="inp sm" type="text" maxlength="200" data-tset="label" aria-label="Label" placeholder="Label" value="'+esc(t.label)+'"></div>'+
+    '<div class="acts"><button class="btn sm" type="button" data-tact="check">Check now</button><button class="btn sm" type="button" data-tact="'+(t.paused?'resume':'pause')+'">'+(t.paused?'Resume checks':'Pause checks')+'</button>'+(t.assetId?'<button class="btn sm" type="button" data-tact="explore" data-ip="'+esc(t.ip)+'">Open in Explorer</button>':'')+'<button class="btn sm" type="button" data-cp="'+esc(t.ip)+'">Copy IP</button><button class="btn sm danger" type="button" data-tact="remove">Stop tracking</button></div></div>'+
+   '<div class="sec"><h3>Recent checks</h3>'+(ch.length?'<div class="trk-log">'+ch.slice(0,50).map(function(c){return '<span class="mono">'+when(c[0])+'</span><span><span class="dot" style="background:var(--t-'+(c[1]?'up':'down')+')"></span> '+(c[1]?'Answered':'No answer')+'</span><span class="dim">'+(c[1]?esc(viaText(c[3]))+(c[2]!=null?' · '+ms(c[2]):''):'')+'</span>'}).join('')+'</div>':'<span class="dim">Not checked yet. The first check runs within a minute.</span>')+'</div>';
+  $('dr').hidden=false;$('ovl').hidden=false;$('dr').scrollTop=0;$('dr').dataset.tid=id;delete $('dr').dataset.asset;
+}).catch(fail)}
+function trkAct(b){
+  var id=+$('dr').dataset.tid,a=b.dataset.tact;
+  if(a==='explore'){closeAll();Object.keys(SEL).forEach(function(k){SEL[k]=new Set()});SEARCH='ip:'+b.dataset.ip;$('q').value=SEARCH;SHOWN=PAGE;VIEW='table';showSection('exp');return}
+  if(a==='remove'){if(!arm(b,'Click again to stop tracking and delete its history'))return;
+    send('/api/tracker/targets','DELETE',{ids:[id]}).then(function(){closeAll();TRK.sel.delete(id);trkDone('Stopped tracking')}).catch(fail);return}
+  if(a==='check'){b.disabled=true;b.textContent='Checking…';
+    send('/api/tracker/check','POST',{ids:[id]}).then(function(d){toast(d.up?'It answered':'No answer');trkOpen(id);trkLoad(true)}).catch(function(e){b.disabled=false;b.textContent='Check now';fail(e)});return}
+  send('/api/tracker/targets','PATCH',{ids:[id],paused:a==='pause'}).then(function(){toast(a==='pause'?'Checks paused':'Checks resumed');trkOpen(id);trkLoad(true)}).catch(fail);
+}
+function trkSet(el){
+  var id=+$('dr').dataset.tid,body={ids:[id]};body[el.dataset.tset]=el.value;
+  send('/api/tracker/targets','PATCH',body).then(function(){toast('Saved');trkOpen(id);trkLoad(true)}).catch(fail)}
+/* The tracker block in the Explorer's asset drawer. */
+function trkAssetSec(r,tr){
+  if(!TRK.sum)return '';
+  if(tr)return '<div class="sec"><h3>IP tracker</h3><div class="trk-row">'+pillSt(tr.status)+'<span class="dim">'+esc(tr.everyLabel)+' · last reply '+(tr.lastUpAt?ago(tr.lastUpAt):'none yet')+'</span><button class="btn sm" type="button" data-topen="'+tr.id+'">Open in Tracker</button></div></div>';
+  if(!/^\d+\.\d+\.\d+\.\d+$/.test(r.ip))return '';
+  return '<div class="sec"><h3>IP tracker</h3><div class="trk-row"><span class="dim">Not tracked.</span><select class="inp sm" id="dr-every" aria-label="How often to check">'+everyOpts(TRK.sum.defaultEvery)+'</select><button class="btn sm" type="button" data-track="'+esc(r.ip)+'">Track this IP</button></div></div>';
+}
+function trkOne(b){
+  var id=+$('dr').dataset.asset;b.disabled=true;
+  send('/api/tracker/targets','POST',{ips:b.dataset.track,every:$('dr-every').value}).then(function(d){toast(d.added?'Tracking '+b.dataset.track+'. The first check runs within a minute.':'Already tracked');openDrawer(id)}).catch(function(e){b.disabled=false;fail(e)})}
+function trkAllOpen(){trkMeta().then(function(s){
+  $('trkdlg-b').innerHTML='<p>Track the IP address of each of the <b>'+fmt(COUNT)+'</b> assets that match the current search and filters. Addresses that are already tracked keep their settings.</p>'+
+   '<div class="trk-row"><label>Check <select class="inp" id="trkdlg-every">'+everyOpts(s.defaultEvery)+'</select></label><input class="inp" id="trkdlg-label" type="text" maxlength="200" aria-label="Label" placeholder="Label (optional)"></div><p class="err" id="trkdlg-msg"></p>';
+  $('trkdlg-go').disabled=!COUNT;$('trkdlg').hidden=false;$('ovl').hidden=false;
+}).catch(fail)}
+function trkAllGo(){
+  $('trkdlg-go').disabled=true;
+  send('/api/tracker/from-explorer?'+params(),'POST',{every:$('trkdlg-every').value,label:$('trkdlg-label').value})
+   .then(function(d){$('trkdlg-go').disabled=false;closeAll();toast(addMsg(d))})
+   .catch(function(e){$('trkdlg-go').disabled=false;$('trkdlg-msg').textContent=e.message});
+}
+function showSection(s){
+  SECTION=s;var t=s==='trk';
+  document.querySelectorAll('[data-sect]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.sect===s))});
+  $('trk').hidden=!t;$('sidetog').hidden=t;
+  if(t){$('app').hidden=true;$('emptydb').hidden=true;$('hint').hidden=true;document.querySelector('.tbar').hidden=true;trkLoad()}
+  else if(META){showEmpty();if(!META.empty)render()}
+  try{history.replaceState(null,'',t?'#tracker':location.pathname+location.search)}catch(e){}
+  setTop();
+}
+
 /* ---------- light / dark ---------- */
 var DARKQ=window.matchMedia('(prefers-color-scheme: dark)');
 var SUN='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -293,6 +461,16 @@ function toggleTheme(){var next=theme()==='dark'?'light':'dark';document.documen
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
   var t=e.target;
+  var sc=t.closest('[data-sect]');if(sc){if(sc.dataset.sect!==SECTION)showSection(sc.dataset.sect);return}
+  var bk=t.closest('[data-bucket]');if(bk){TRK.bucket=bk.dataset.bucket;TRK.shown=PAGE;trkLoad();return}
+  var ts=t.closest('th[data-ts]');if(ts){var tk=ts.dataset.ts;if(TRK.sort.k===tk)TRK.sort.d=-TRK.sort.d;else TRK.sort={k:tk,d:1};trkLoad();return}
+  var ck=t.closest('.ck');if(ck){if(t.tagName!=='INPUT')ck.querySelector('input').click();return}
+  var ttr=t.closest('tr[data-tid]');if(ttr){trkOpen(+ttr.dataset.tid);return}
+  var tp=t.closest('[data-tpg]');if(tp){TRK.shown=tp.dataset.tpg==='all'?TRK.count:TRK.shown+PAGE;trkLoad();return}
+  var bu=t.closest('[data-bulk]');if(bu){trkBulkAct(bu);return}
+  var ta=t.closest('[data-tact]');if(ta){trkAct(ta);return}
+  var to=t.closest('[data-topen]');if(to){closeAll();showSection('trk');trkOpen(+to.dataset.topen);return}
+  var tk1=t.closest('[data-track]');if(tk1){trkOne(tk1);return}
   var fh=t.closest('[data-fh]');if(fh){var k=fh.dataset.fh;OPEN[k]=!OPEN[k];fh.parentNode.classList.toggle('open',OPEN[k]);fh.setAttribute('aria-expanded',String(OPEN[k]));return}
   var mo=t.closest('[data-more]');if(mo){var k2=mo.dataset.more;FMORE[k2]=!FMORE[k2];loadFacet(k2);return}
   var f=t.closest('[data-f]');if(f){toggleSel(f.dataset.f,f.dataset.v);return}
@@ -313,15 +491,19 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){closeAll();return}
-  if((e.key==='Enter'||e.key===' ')&&e.target.matches('th[data-s]')){e.preventDefault();e.target.click()}});
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('th[data-s],th[data-ts]')){e.preventDefault();e.target.click();return}
+  if(e.key==='Enter'&&(e.target.id==='trk-label'||(e.target.id==='trk-ips'&&(e.ctrlKey||e.metaKey)))){e.preventDefault();trkAdd()}});
 var FT={};
 document.addEventListener('input',function(e){
   var t=e.target;
-  if(t.matches('[data-fs]')){var k=t.dataset.fs;FQ[k]=t.value;clearTimeout(FT[k]);FT[k]=setTimeout(function(){loadFacet(k)},150)}});
+  if(t.matches('[data-fs]')){var k=t.dataset.fs;FQ[k]=t.value;clearTimeout(FT[k]);FT[k]=setTimeout(function(){loadFacet(k)},150);return}
+  if(t.id==='trk-q'){clearTimeout(FT.__trk);FT.__trk=setTimeout(function(){TRK.q=t.value.trim();TRK.shown=PAGE;trkLoad()},200)}});
 document.addEventListener('change',function(e){
   var t=e.target;
   if(t.matches('[data-col]')){COLSEL[t.dataset.col]=t.checked;loadRows(false);return}
   if(t.matches('[data-map]')){setMap(t.dataset.map,+t.value);return}
+  if(t.matches('[data-tsel]')){trkSelect(t);return}
+  if(t.matches('[data-tset]')){trkSet(t);return}
   if(t.id==='f-rz'){takeFile('rz',t.files[0]);return}
   if(t.id==='f-bc'){takeFile('bc',t.files[0])}});
 ['dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){var z=e.target.closest&&e.target.closest('.dz');if(!z)return;e.preventDefault();
@@ -335,6 +517,10 @@ $('clr').addEventListener('click',function(){Object.keys(SEL).forEach(function(k
 $('reset').addEventListener('click',function(){Object.keys(SEL).forEach(function(k){SEL[k]=new Set()});SEARCH='';$('q').value='';SHOWN=PAGE;render()});
 $('copy').addEventListener('click',copyCsv);
 $('download').addEventListener('click',downloadCsv);
+$('trkall').addEventListener('click',trkAllOpen);
+$('trkdlg-go').addEventListener('click',trkAllGo);
+$('trk-go').addEventListener('click',trkAdd);
+$('trk-dl').addEventListener('click',function(){location.href='/api/tracker/export.csv?'+trkParams({download:1})});
 $('colbtn').addEventListener('click',function(e){e.stopPropagation();colMenu()});
 $('dens').addEventListener('click',function(){var on=$('dens').getAttribute('aria-pressed')!=='true';$('dens').setAttribute('aria-pressed',String(on));$('tbl').classList.toggle('dense',on)});
 $('chtog').addEventListener('click',function(){SHOWCH=!SHOWCH;$('chtog').setAttribute('aria-pressed',String(SHOWCH));try{localStorage.setItem('ipx-charts',SHOWCH?'on':'off')}catch(e){}if(SHOWCH)render();else{renderCharts(null);setTop()}});
@@ -348,5 +534,6 @@ window.addEventListener('resize',setTop);
 /* ---------- init ---------- */
 try{SHOWCH=localStorage.getItem('ipx-charts')!=='off'}catch(e){}
 $('chtog').setAttribute('aria-pressed',String(SHOWCH));
-api('/api/meta').then(function(m){setupMeta(m);buildFacets();renderSrcs();showEmpty();if(!m.empty)render();else setTop()}).catch(fail);
+api('/api/meta').then(function(m){setupMeta(m);buildFacets();renderSrcs();showSection(location.hash==='#tracker'?'trk':'exp')}).catch(fail);
+setInterval(function(){if(SECTION==='trk'&&!document.hidden)trkLoad(true)},30000);
 })();
