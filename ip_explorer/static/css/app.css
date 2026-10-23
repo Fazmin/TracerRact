@@ -206,6 +206,10 @@ details summary{cursor:pointer;color:var(--accent);padding:4px 0}
 .dlg-b{padding:16px 18px;overflow:auto;flex:1;min-height:200px}
 .dlg>footer{display:flex;gap:10px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
 .dlg>footer .sp{flex:1}
+.dlg.sm{width:min(480px,calc(100% - 24px))}
+.dlg.sm .dlg-b{min-height:0;line-height:1.5}
+.dlg.sm .dlg-b p{margin:0 0 10px}
+.dlg.sm .dlg-b p:last-child{margin:0;color:var(--muted)}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
 .card h3{margin:0 0 4px;font-size:14px}

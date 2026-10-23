@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-<script>try{var t=localStorage.getItem('ipx-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -18,7 +17,8 @@
     <div class="srcs" id="srcs"></div>
     <span class="sp"></span>
     <button class="btn" id="sidetog" type="button">Filters</button>
-    <button class="btn icon" id="theme" type="button" aria-label="Switch to dark mode" title="Switch to dark mode"></button>
+    <button class="btn icon" id="theme" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" hidden></button>
+    <button class="btn" id="aboutbtn" type="button">About</button>
     <button class="btn primary" id="load" type="button">Load runZero / BlueCat file</button>
   </div>
   <div class="tbar">
@@ -63,6 +63,13 @@
   <header><h2 id="imp-t">Load data</h2><ol class="steps" id="steps"></ol><button class="x" id="imp-x" type="button" aria-label="Close">×</button></header>
   <div class="dlg-b" id="imp-b"></div>
   <footer><button class="btn" id="imp-back" type="button">Back</button><span class="sp"></span><span id="imp-msg" class="dim"></span><button class="btn primary" id="imp-next" type="button">Next</button></footer>
+</div>
+<div class="dlg sm" id="about" role="dialog" aria-modal="true" aria-labelledby="about-t" hidden>
+  <header><h2 id="about-t">About</h2><span class="sp"></span><button class="x" type="button" data-close aria-label="Close">×</button></header>
+  <div class="dlg-b">
+    <p>IP Asset Explorer combines a BlueCat IPAM export with a runZero asset export, so you can search and filter every address by building, room, owner, device type, risk and open ports in one place.</p>
+    <p>Built by Fazmin Nizam. This is an experimental tool, so check anything important against BlueCat or runZero.</p>
+  </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
 

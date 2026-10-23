@@ -25,7 +25,31 @@ The first time, the explorer is empty. Click **Load runZero / BlueCat file** to 
 | `./start.sh --no-open` | Don't open a browser |
 | `./start.sh stop` | Stop it. Your data is kept |
 
-On Windows without bash, run `docker compose up --build` instead. The log shows the address when the app is ready.
+On Windows, run `.\start.cmd` in PowerShell or `start.cmd` in Command Prompt. It does the same as `./start.sh` and takes the same options, for example `.\start.cmd --port 9090` or `.\start.cmd stop`. It runs `start.ps1` with PowerShell, so you don't need to change the execution policy.
+
+## Get the BlueCat export
+
+`scripts/blucat_export.py` exports every IPv4 address from BlueCat Address Manager to a CSV that the explorer's BlueCat upload reads as is. It only reads from BlueCat, through the BAM REST v1 API. You need Python 3, the `requests` package and a BlueCat account with API access.
+
+Run it from this folder and write the CSV somewhere outside it:
+
+```sh
+pip install requests
+export BAM_URL=https://your-bluecat-server   # PowerShell: $env:BAM_URL = "https://your-bluecat-server"
+export BAM_USER=your_api_username            # PowerShell: $env:BAM_USER = "your_api_username"
+python scripts/blucat_export.py --out ../bluecat.csv
+```
+
+It asks for anything you didn't set, and for your password unless you set `BAM_PASS`. When it finishes, click **Load runZero / BlueCat file** and upload the CSV as the BlueCat file.
+
+| Option | What it does |
+|---|---|
+| `--block 172.30.0.0/16` | Export one block only. Good for a first test run |
+| `--no-hosts` | Skip the host name lookups. Much faster, but the Host Name column is empty |
+| `--config NAME` | BlueCat configuration to read. Default: `McMaster` |
+| `--out PATH` | Where to write the CSV. Default: `bluecat_allocated_ips_<date>.csv` in the current folder |
+
+Owner and Room come from BlueCat user-defined fields named `Owner` and `Room`. If yours are named differently, change `UDF_OWNER` and `UDF_ROOM` at the top of the script.
 
 ## Your data
 

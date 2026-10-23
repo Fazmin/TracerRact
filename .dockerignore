@@ -11,4 +11,6 @@ tests
 **/__pycache__
 *.pyc
 start.sh
+start.ps1
+start.cmd
 README.md
