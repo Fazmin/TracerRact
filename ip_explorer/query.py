@@ -298,8 +298,9 @@ def meta(db):
                          'uploadedAt': f['uploaded_at'],
                          'canReset': bool(has_builtin) and f['role'] == 'active'} if f else None
     stats_row = db.execute("SELECT value FROM meta WHERE key = 'stats'").fetchone()
-    total, rz_n, bc_n = db.execute('SELECT COUNT(*), TOTAL(hasRz), TOTAL(hasBc) FROM assets').fetchone()
+    total, rz_n = db.execute('SELECT COUNT(*), TOTAL(hasRz) FROM assets').fetchone()
+    # BlueCat addresses linked to an asset through another IP share its row, so count the file instead.
     return {'empty': False, 'facets': [f.public() for f in FACETS], 'columns': [c.public() for c in all_columns(db)],
             'sources': sources, 'stats': json.loads(stats_row[0]) if stats_row else {}, 'total': total,
-            'rzCount': int(rz_n), 'bcCount': int(bc_n),
+            'rzCount': int(rz_n), 'bcCount': sources['bc']['rows'] if sources['bc'] else 0,
             'rzFields': [{'k': f['k'], 'l': f['l'], 'req': bool(f.get('req'))} for f in RZF]}

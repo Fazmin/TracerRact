@@ -76,4 +76,4 @@ IPX_BLUECAT_CSV=/path/to/bluecat.csv IPX_RUNZERO_CSV=/path/to/runzero.csv \
 IPX_ORIGINAL_HTML="/path/to/IP Asset Explorer_McMaster_2026.html" .venv/bin/pytest tests/test_parity.py
 ```
 
-Its intermediate output goes to a temporary folder that is deleted afterwards.
+Its intermediate output goes to a temporary folder that is deleted afterwards. The explorer now matches on every address of a runZero asset (`address`, `addresses_scope` and `addresses_extra`), which the original did not, so the test ignores those additions; its docstring lists where results still differ by design.

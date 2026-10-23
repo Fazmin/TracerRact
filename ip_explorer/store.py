@@ -10,15 +10,16 @@ from datetime import datetime, timezone
 from . import ingest
 from .db import transaction
 from .facets import FACETS, RISK_ORDER
-from .merge import merge
+from .merge import addresses, merge
 from .search import SEARCH_FIELDS, search_row
+from .util import ipn
 
 BC_KEYS = list(ingest.BCF)
-ASSET_SCALARS = ['hasRz', 'hasBc', 'dup', 'ip', 'n', 'host', 'mac', 'vendor', 'bcHost', 'an', 'owner', 'room', 'roomL',
-                 'bldC', 'bld', 'bldSrc', 'sub', 'subName', 'parent', 'state', 'loc', 'type', 'cat', 'os', 'osv', 'hw',
-                 'risk', 'alive', 'first', 'last', 'agent', 'det', 'eol', 'serial', 'vlan', 'func', 'crit', 'notes',
+ASSET_SCALARS = ['hasRz', 'hasBc', 'dup', 'ip', 'n', 'ipSrc', 'host', 'mac', 'vendor', 'bcIp', 'bcHost', 'an', 'owner', 'room',
+                 'roomL', 'bldC', 'bld', 'bldSrc', 'sub', 'subName', 'parent', 'state', 'loc', 'type', 'cat', 'os', 'osv',
+                 'hw', 'risk', 'alive', 'first', 'last', 'agent', 'det', 'eol', 'serial', 'vlan', 'func', 'crit', 'notes',
                  'cov', 'match', 'blk', 'seenB', 'seenM', 'seenD']
-ASSET_LISTS = ['ips2', 'hosts', 'macs', 'tcp', 'udp', 'proto', 'prod', 'tags']
+ASSET_LISTS = ['scopeIps', 'ips2', 'hosts', 'macs', 'tcp', 'udp', 'proto', 'prod', 'tags', 'bcMore']
 BOOL_FIELDS = {'hasRz', 'hasBc', 'dup'}
 # Record keys that are SQL keywords are stored under another column name.
 DB_NAME = {'first': 'first_ms', 'last': 'last_ms', 'match': 'match_by'}
@@ -208,13 +209,24 @@ def reset(db, kind):
 
 
 def rebuild(db):
-    """Re-merge the effective files into assets, asset_facets, asset_search and meta. Call inside a transaction."""
+    """Re-merge the effective files into assets, asset_facets, asset_search, asset_ips and meta. Call inside a transaction."""
     recs, stats = merge(*_sources(db))
-    for t in ('assets', 'asset_facets', 'asset_search', 'meta'):
+    for t in ('assets', 'asset_facets', 'asset_search', 'asset_ips', 'meta'):
         db.execute(f'DELETE FROM {t}')
     db.executemany(_INSERT_ASSET, (record_to_row(r) for r in recs))
     db.executemany('INSERT INTO asset_facets (asset_id, facet, value) VALUES (?, ?, ?)',
                    ((r['id'], f.k, v) for r in recs for f in FACETS for v in f.values(r)))
     db.executemany(_INSERT_SEARCH, ([r['id']] + search_row(r) for r in recs))
+    db.executemany('INSERT INTO asset_ips (asset_id, n) VALUES (?, ?)',
+                   ((r['id'], n) for r in recs for n in {ipn(x) for x in addresses(r)} if n >= 0))
     db.execute("INSERT INTO meta (key, value) VALUES ('stats', ?)", (_dumps(stats),))
     return len(recs)
+
+
+def upgrade(db):
+    """Bring a database built by an older version up to date: map runZero fields added since its files were
+    uploaded (by column name, keeping every stored choice), then re-merge. Call inside a transaction."""
+    for f in db.execute("SELECT id, headers, column_map FROM source_files WHERE kind = 'rz'").fetchall():
+        m = {**ingest.auto_map(json.loads(f['headers'])), **json.loads(f['column_map'])}
+        db.execute('UPDATE source_files SET column_map = ? WHERE id = ?', (_dumps(m), f['id']))
+    return rebuild(db)

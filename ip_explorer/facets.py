@@ -25,6 +25,12 @@ class Facet:
         return {'k': self.k, 'l': self.l, 'open': self.open, 'search': self.search}
 
 
+def _subnets(r):
+    """The asset's subnet plus those of any further BlueCat addresses linked to it."""
+    subs = [x['sub'] + '  ' + x['subName'] for x in [r, *r['bcMore']] if x['sub']]
+    return list(dict.fromkeys(subs)) or ['(no subnet)']
+
+
 FACETS = [
     Facet('cov', 'Coverage', lambda r: [r['cov']], open=True, order=COV_ORDER),
     Facet('bld', 'Building', lambda r: [r['bld']], open=True, search=True),
@@ -35,7 +41,7 @@ FACETS = [
     Facet('alive', 'Alive when last scanned', lambda r: [r['alive'] or '(unknown)'], rz=True),
     Facet('seen', 'Last seen', lambda r: [r['seenB']], rz=True, order=SEEN_ORDER),
     Facet('seenM', 'Last seen month', lambda r: [r['seenM']] if r['seenM'] else [], rz=True, search=True),
-    Facet('sub', 'Subnet', lambda r: [r['sub'] + '  ' + r['subName']] if r['sub'] else ['(no subnet)'], search=True),
+    Facet('sub', 'Subnet', _subnets, search=True),
     Facet('blk', 'Address block', lambda r: [r['blk']]),
     Facet('owner', 'Owner', lambda r: [r['owner']] if r['owner'] else ['(no owner)'], search=True),
     Facet('state', 'BlueCat state', lambda r: [(r['state'] or '(blank)') if r['hasBc'] else '(not in BlueCat)']),

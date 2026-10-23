@@ -42,8 +42,12 @@ function pillRisk(v){if(!v)return '<span class="dim">–</span>';var c={critical
 function pillCov(v){var c={'Both':'--c-both','runZero only':'--c-rz','BlueCat only':'--c-bc'}[v];return '<span class="pill"><span class="dot" style="background:var('+c+')"></span>'+esc(v)+'</span>'}
 function dim(v){return v?esc(v):'<span class="dim">–</span>'}
 function mono(v){return v?'<span class="mono">'+esc(v)+'</span>':'<span class="dim">–</span>'}
+function addrs(r){var o=[];[r.ip].concat(r.scopeIps,r.ips2,[r.bcIp],r.bcMore.map(function(b){return b.ip})).forEach(function(x){if(x&&o.indexOf(x)<0)o.push(x)});return o}
+// Where the IP shown for an asset with no runZero address came from (record field ipSrc).
+var IPSRC={'Scope IP':'scope IP','Extra IP':'extra IP','BlueCat address':'BlueCat address'};
 var CELL={
- n:function(r){return '<span class="mono">'+esc(r.ip||'(none)')+'</span>'},
+ n:function(r){return '<span class="mono">'+esc(r.ip||'(none)')+'</span>'+(r.ipSrc?' <span class="dim" title="'+esc('No runZero address. This is its first '+IPSRC[r.ipSrc]+'.')+'">'+esc(IPSRC[r.ipSrc])+'</span>':'')},
+ ips:function(r){return mono(addrs(r).join(' '))},
  bld:function(r){return esc(r.bldC.indexOf('LOC:')===0?r.bld:r.bldC)},
  roomL:function(r){return dim(r.room)},
  hw:function(r){return dim(r.hw||r.os)},
@@ -163,7 +167,7 @@ function renderSrcs(){
   var rz=META.sources.rz,bc=META.sources.bc,st=META.stats||{};
   $('srcs').innerHTML='<span class="src"><i style="background:var(--c-rz)"></i>runZero <b title="'+esc(rz?rz.name:'none')+'">'+esc(rz?rz.name:'none loaded')+'</b> '+fmt(META.rzCount)+' assets</span>'+
    '<span class="src"><i style="background:var(--c-bc)"></i>BlueCat <b title="'+esc(bc?bc.name:'none')+'">'+esc(bc?bc.name:'none loaded')+'</b> '+fmt(META.bcCount)+' addresses</span>'+
-   (st.rzRows?'<span class="src"><i style="background:var(--c-both)"></i>'+fmt(st.byIp+st.byExtra+st.byMac)+' matched</span>':'');
+   (st.rzRows?'<span class="src"><i style="background:var(--c-both)"></i>'+fmt(st.byIp+st.byScope+st.byExtra+st.byMac)+' matched</span>':'');
 }
 function showEmpty(){var e=!!META.empty;$('emptydb').hidden=!e;$('app').hidden=e;$('hint').hidden=e;document.querySelector('.tbar').hidden=e}
 
@@ -173,9 +177,11 @@ function openDrawer(id){api('/api/assets/'+id).then(function(d){
   var r=d.asset,nb=d.neighbours,nbn=d.neighbourCount,same=d.sameSubnet;
   var all=[];if(r.raw)Object.keys(r.raw).forEach(function(k){all.push([k,r.raw[k]])});
   $('dr').innerHTML='<div class="dr-h"><div><h2>'+esc(r.ip||'No IP address')+'</h2><p>'+esc(r.host||r.an||'Unnamed asset')+(r.type?' · '+esc(r.type):'')+'</p></div><button class="x" type="button" data-close="dr" aria-label="Close detail">×</button></div>'+
-   '<div class="tags">'+pillCov(r.cov).replace('class="pill"','class="tag"')+(r.risk?'<span class="tag">Risk '+pillRisk(r.risk)+'</span>':'')+(r.alive?'<span class="tag">Alive: '+esc(r.alive)+'</span>':'')+(r.eol?'<span class="tag" style="color:var(--bad)">OS end-of-life '+esc(r.eol)+'</span>':'')+(r.match?'<span class="tag">Matched by '+esc(r.match)+'</span>':'')+(r.dup?'<span class="tag" style="color:var(--bad)">Duplicate IP in runZero file</span>':'')+'</div>'+
-   '<div class="sec"><h3>Location</h3>'+dl([['Building',r.bld],['Building source',r.bldSrc],['Room',r.room],['Owner',r.owner],['Subnet',r.sub?r.sub+(same?' ('+fmt(same)+' records)':''):''],['Subnet name',r.subName],['Address block',r.blk],['BlueCat state',r.state],['BlueCat location',r.loc]])+'</div>'+
-   '<div class="sec"><h3>Identity</h3>'+dl([['Hostnames',r.hosts.join(', ')],['BlueCat name',r.an],['MAC',r.macs.length?r.macs.join(', '):r.mac],['MAC vendor',r.vendor],['Other IPs',r.ips2.join(', ')],['Serial numbers',r.serial]])+'</div>'+
+   '<div class="tags">'+pillCov(r.cov).replace('class="pill"','class="tag"')+(r.risk?'<span class="tag">Risk '+pillRisk(r.risk)+'</span>':'')+(r.alive?'<span class="tag">Alive: '+esc(r.alive)+'</span>':'')+(r.eol?'<span class="tag" style="color:var(--bad)">OS end-of-life '+esc(r.eol)+'</span>':'')+(r.match?'<span class="tag">Matched by '+esc(r.match)+'</span>':'')+(r.ipSrc?'<span class="tag">No runZero address</span>':'')+(r.dup?'<span class="tag" style="color:var(--bad)">Duplicate IP in runZero file</span>':'')+'</div>'+
+   '<div class="sec"><h3>Addresses</h3>'+dl([['runZero address',r.hasRz?(r.ipSrc?'None. The IP shown is its first '+IPSRC[r.ipSrc]+'.':r.ip||'None'):''],['Scope IPs',r.scopeIps.join(', ')],['Extra IPs',r.ips2.join(', ')],['BlueCat address',r.bcIp],['Address block',r.blk]])+'</div>'+
+   (r.bcMore.length?'<div class="sec"><h3>Other BlueCat addresses of this asset ('+r.bcMore.length+')</h3>'+dl(r.bcMore.map(function(b){return [b.ip,[b.via,b.host,b.subName||b.sub,b.room&&'Room '+b.room,b.owner,b.state].filter(Boolean).join(' · ')]}))+'</div>':'')+
+   '<div class="sec"><h3>Location</h3>'+dl([['Building',r.bld],['Building source',r.bldSrc],['Room',r.room],['Owner',r.owner],['Subnet',r.sub?r.sub+(same?' ('+fmt(same)+' records)':''):''],['Subnet name',r.subName],['BlueCat state',r.state],['BlueCat location',r.loc]])+'</div>'+
+   '<div class="sec"><h3>Identity</h3>'+dl([['Hostnames',r.hosts.join(', ')],['BlueCat name',r.an],['MAC',r.macs.length?r.macs.join(', '):r.mac],['MAC vendor',r.vendor],['Serial numbers',r.serial]])+'</div>'+
    (r.hasRz?'<div class="sec"><h3>runZero</h3>'+dl([['Type',r.type],['Category',r.cat],['OS',(r.os+' '+r.osv).trim()],['Hardware',r.hw],['First seen',isoDay(r.first)],['Last seen',isoDay(r.last)],['Detected by',r.det],['Scanned by',r.agent],['Functions',r.func],['VLAN',r.vlan],['Criticality',r.crit],['Comments',r.notes]])+'</div>'+
     '<div class="sec"><h3>Network exposure</h3>'+dl([['TCP ports',r.tcp.join(' ')],['UDP ports',r.udp.join(' ')],['Protocols',r.proto.join(' ')],['Products',r.prod.join(' ')],['Tags',r.tags.map(function(t){return t[0]+': '+t[1]}).join(', ')]])+'</div>':'<div class="sec"><h3>runZero</h3><span class="dim">This address is in BlueCat but was not found in the runZero file.</span></div>')+
    '<div class="acts">'+(r.room?'<button class="btn sm" type="button" data-q="room" data-v="'+esc(r.roomL)+'">Filter to this room</button>':'')+'<button class="btn sm" type="button" data-q="bld" data-v="'+esc(r.bld)+'">Filter to this building</button>'+(r.sub?'<button class="btn sm" type="button" data-q="sub" data-v="'+esc(r.sub+'  '+r.subName)+'">Filter to this subnet</button>':'')+(r.type?'<button class="btn sm" type="button" data-q="type" data-v="'+esc(r.type)+'">Same device type</button>':'')+(r.owner?'<button class="btn sm" type="button" data-q="owner" data-v="'+esc(r.owner)+'">Same owner</button>':'')+'<button class="btn sm" type="button" data-cp="'+esc(r.ip)+'">Copy IP</button></div>'+
@@ -238,9 +244,9 @@ function renderImp(){
     next.textContent='Next: review';next.disabled=!ipOk;
   }else{
     var t=IMP.res.stats;
-    b.innerHTML='<div class="stats">'+[[fmt(t.byIp+t.byExtra+t.byMac),'Matched to BlueCat'],[fmt(t.rzOnly),'runZero only'],[fmt(t.bcOnly),'BlueCat only'],[fmt(IMP.res.total),'Total assets']].map(function(x){return '<div class="kpi"><div class="v">'+x[0]+'</div><div class="l">'+x[1]+'</div></div>'}).join('')+'</div>'+
-     '<div class="card"><h3>How matching worked</h3><p style="margin:0">'+fmt(t.byIp)+' assets matched on IP address'+(t.byExtra?', '+fmt(t.byExtra)+' on a secondary IP':'')+(t.byMac?', '+fmt(t.byMac)+' on MAC address':'')+'. Each match brings the BlueCat room, owner, subnet and state onto the runZero asset. Assets only in runZero get their building from the BlueCat subnet they sit in, or from a runZero location tag when no subnet is known.</p></div>'+
-     (t.noIp?'<div class="warn"><b>'+fmt(t.noIp)+'</b> runZero rows have no IP address. They are kept but cannot be matched.</div>':'')+
+    b.innerHTML='<div class="stats">'+[[fmt(t.byIp+t.byScope+t.byExtra+t.byMac),'Matched to BlueCat'],[fmt(t.rzOnly),'runZero only'],[fmt(t.bcOnly),'BlueCat only'],[fmt(IMP.res.total),'Total assets']].map(function(x){return '<div class="kpi"><div class="v">'+x[0]+'</div><div class="l">'+x[1]+'</div></div>'}).join('')+'</div>'+
+     '<div class="card"><h3>How matching worked</h3><p style="margin:0">'+fmt(t.byIp)+' assets matched on IP address'+(t.byScope?', '+fmt(t.byScope)+' on a scope IP':'')+(t.byExtra?', '+fmt(t.byExtra)+' on an extra IP':'')+(t.byMac?', '+fmt(t.byMac)+' on MAC address':'')+'.'+(t.bcLinked?' '+fmt(t.bcLinked)+' more BlueCat addresses were linked to the same assets through their other IPs.':'')+' Each match brings the BlueCat room, owner, subnet and state onto the runZero asset. Assets only in runZero get their building from the BlueCat subnet they sit in, or from a runZero location tag when no subnet is known.</p></div>'+
+     (t.noIp?'<div class="warn"><b>'+fmt(t.noIp)+'</b> runZero rows have no primary IP address. They are kept, shown by their first scope or extra IP, and matched on those or a MAC address where they have one.</div>':'')+
      (t.badIp?'<div class="warn"><b>'+fmt(t.badIp)+'</b> rows have an IP value that is not IPv4.</div>':'')+
      (t.dupIp?'<div class="warn"><b>'+fmt(t.dupIp)+'</b> runZero rows repeat an IP already in the file. Both are shown and flagged.</div>':'')+
      (t.noLoc?'<div class="warn"><b>'+fmt(t.noLoc)+'</b> runZero-only assets sit outside every BlueCat subnet, so their building comes from tags or stays Other / unknown.</div>':'');

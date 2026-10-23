@@ -32,8 +32,8 @@ CREATE INDEX IF NOT EXISTS idx_runzero_rows_file ON runzero_rows (file_id, idx);
 CREATE TABLE IF NOT EXISTS assets (
   id INTEGER PRIMARY KEY,
   hasRz INTEGER NOT NULL, hasBc INTEGER NOT NULL, dup INTEGER NOT NULL,
-  ip TEXT NOT NULL, n INTEGER NOT NULL,
-  host TEXT NOT NULL, mac TEXT NOT NULL, vendor TEXT NOT NULL, bcHost TEXT NOT NULL, an TEXT NOT NULL,
+  ip TEXT NOT NULL, n INTEGER NOT NULL, ipSrc TEXT NOT NULL,
+  host TEXT NOT NULL, mac TEXT NOT NULL, vendor TEXT NOT NULL, bcIp TEXT NOT NULL, bcHost TEXT NOT NULL, an TEXT NOT NULL,
   owner TEXT NOT NULL, room TEXT NOT NULL, roomL TEXT NOT NULL, bldC TEXT NOT NULL, bld TEXT NOT NULL,
   bldSrc TEXT NOT NULL, sub TEXT NOT NULL, subName TEXT NOT NULL, parent TEXT NOT NULL, state TEXT NOT NULL,
   loc TEXT NOT NULL, type TEXT NOT NULL, cat TEXT NOT NULL, os TEXT NOT NULL, osv TEXT NOT NULL, hw TEXT NOT NULL,
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS assets (
   det TEXT NOT NULL, eol TEXT NOT NULL, serial TEXT NOT NULL, vlan TEXT NOT NULL, func TEXT NOT NULL,
   crit TEXT NOT NULL, notes TEXT NOT NULL, cov TEXT NOT NULL, match_by TEXT NOT NULL, blk TEXT NOT NULL,
   seenB TEXT NOT NULL, seenM TEXT NOT NULL, seenD INTEGER NOT NULL,
-  ips2 TEXT NOT NULL, hosts TEXT NOT NULL, macs TEXT NOT NULL, tcp TEXT NOT NULL, udp TEXT NOT NULL,
-  proto TEXT NOT NULL, prod TEXT NOT NULL, tags TEXT NOT NULL, raw TEXT,
+  scopeIps TEXT NOT NULL, ips2 TEXT NOT NULL, hosts TEXT NOT NULL, macs TEXT NOT NULL, tcp TEXT NOT NULL, udp TEXT NOT NULL,
+  proto TEXT NOT NULL, prod TEXT NOT NULL, tags TEXT NOT NULL, bcMore TEXT NOT NULL, raw TEXT,
   risk_idx INTEGER NOT NULL, tcp_count INTEGER NOT NULL, tag_count INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_assets_room ON assets (bld, roomL);
@@ -67,6 +67,13 @@ CREATE TABLE IF NOT EXISTS asset_search (
   f_cat TEXT NOT NULL, f_proto TEXT NOT NULL, f_product TEXT NOT NULL, f_agent TEXT NOT NULL, f_note TEXT NOT NULL,
   f_cov TEXT NOT NULL, f_alive TEXT NOT NULL, f_serial TEXT NOT NULL, f_vlan TEXT NOT NULL, f_eol TEXT NOT NULL
 );
+
+-- Every IPv4 address of each asset (see merge.addresses), for CIDR and range searches.
+CREATE TABLE IF NOT EXISTS asset_ips (
+  asset_id INTEGER NOT NULL,
+  n INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_asset_ips_n ON asset_ips (n, asset_id);
 
 -- Merge stats and the reference time used for "last seen" buckets.
 CREATE TABLE IF NOT EXISTS meta (
