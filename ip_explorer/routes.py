@@ -130,6 +130,11 @@ def tracker_targets():
                            limit=min(max(1, query._int(a.get('limit'), query.PAGE)), tracker.MAX_ADD), **_tracker_list_args())
 
 
+@bp.get('/api/tracker/groups')
+def tracker_groups():
+    return tracker.groups(get_db(), (request.args.get('q') or '').strip())
+
+
 NO_ADDRESSES = 'Enter IP addresses, CIDR blocks such as 10.1.2.0/24, or ranges such as 10.1.2.5-10.1.2.40.'
 
 

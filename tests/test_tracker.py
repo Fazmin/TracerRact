@@ -223,6 +223,22 @@ def test_scans(client):
     assert client.delete(f"/api/tracker/scans/{a['scan']}").status_code == 404
 
 
+def test_groups(client):
+    client.post('/api/tracker/targets', json={'ips': '10.0.9.1'})  # on its own
+    a = client.post('/api/tracker/scans', json={'ips': '10.0.1.0/29', 'name': 'Lab'}).get_json()['scan']
+    b = client.post('/api/tracker/scans', json={'ips': '10.0.2.1-10.0.2.3', 'name': 'Kiosks'}).get_json()['scan']
+
+    def groups(q=''):
+        d = client.get('/api/tracker/groups', query_string={'q': q}).get_json()
+        return [(g['id'], g['name'], g['counts']['all']) for g in d['groups']], d['counts']['all']
+    assert groups() == ([(b, 'Kiosks', 3), (a, 'Lab', 6), (None, 'Added one at a time', 1)], 10)
+    # A search counts what it finds in each scan; scans it finds nothing in count 0.
+    assert groups('10.0.1.0/30') == ([(b, 'Kiosks', 0), (a, 'Lab', 3)], 3)
+    assert groups('kiosks') == ([(b, 'Kiosks', 3), (a, 'Lab', 0)], 3)
+    # The Scans table does not follow the search.
+    assert [s['counts']['all'] for s in client.get('/api/tracker').get_json()['scans']] == [3, 6, 1]
+
+
 def test_paced_checks_go_one_at_a_time(app):
     with app.app_context():
         db = get_db()

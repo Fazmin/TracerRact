@@ -444,12 +444,14 @@ def counts(db, now=None, q='', scan=''):
     return _tally(db.execute(f'SELECT ({STATUS}), ({silent_sql(now)}), COUNT(*) FROM {_CTX} WHERE {where} GROUP BY 1, 2', params))
 
 
-def scans(db, now=None):
+def scans(db, now=None, q=''):
     """Every scan with its settings and counts, by name. Addresses tracked on their own follow as a
-    scan with id None, when there are any."""
+    scan with id None, when there are any. With a search, the counts are of the addresses it finds."""
     now = _now(now)
     groups, timing = {}, {}
-    for sid, st, silent, n in db.execute(f'SELECT t.scan_id, ({STATUS}), ({silent_sql(now)}), COUNT(*) FROM track_targets t GROUP BY 1, 2, 3'):
+    where, params = _where(q, '', now)
+    for sid, st, silent, n in db.execute(f'SELECT t.scan_id, ({STATUS}), ({silent_sql(now)}), COUNT(*) FROM {_CTX} '
+                                         f'WHERE {where} GROUP BY 1, 2, 3', params):
         groups.setdefault(sid, []).append((st, silent, n))
     for sid, due, nxt, last in db.execute('SELECT scan_id, SUM(paused = 0 AND next_at <= ?), MIN(CASE WHEN paused = 0 THEN next_at END), '
                                           'MAX(last_at) FROM track_targets GROUP BY scan_id', (now,)):
@@ -461,6 +463,13 @@ def scans(db, now=None):
     if None in groups:
         out.append({'id': None, 'name': 'Added one at a time', 'counts': _tally(groups[None]), **timing[None]})
     return out
+
+
+def groups(db, q='', now=None):
+    """The address list grouped by scan: each scan with the counts of the addresses this search finds
+    in it, and the counts of all of them. The rows of a group come from targets(scan=...)."""
+    now = _now(now)
+    return {'groups': scans(db, now, q), 'counts': counts(db, now, q)}
 
 
 def summary(db, now=None):

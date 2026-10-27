@@ -285,7 +285,10 @@ function resetKind(kind){IMP.busy=true;renderImp();
 
 /* ---------- IP tracker ---------- */
 var SECTION='exp';
-var TRK={sum:null,rows:[],count:0,counts:null,bucket:'',scan:'',q:'',sort:{k:'ip',d:1},shown:200,sel:new Set(),seq:0,arm:null};
+/* group: list the addresses under their scans; groups: those scans, each with its open rows; open and
+   gshown: groups the viewer opened or closed, and how many rows each shows. */
+var TRK={sum:null,rows:[],count:0,counts:null,bucket:'',scan:'',q:'',sort:{k:'ip',d:1},shown:200,sel:new Set(),seq:0,arm:null,
+  group:true,groups:null,open:{},gshown:{}};
 /* Seconds a paced check of an address that does not answer can take: ping and its retry, then the TCP ports. */
 var PROBE_MAX=7.5;
 function pad(n){return (n<10?'0':'')+n}
@@ -307,16 +310,35 @@ function trkParams(extra){
   var p=new URLSearchParams();if(TRK.bucket)p.set('bucket',TRK.bucket);if(TRK.scan)p.set('scan',TRK.scan);if(TRK.q)p.set('q',TRK.q);
   p.set('sort',TRK.sort.k);p.set('dir',String(TRK.sort.d));Object.keys(extra||{}).forEach(function(k){p.set(k,extra[k])});return p.toString()}
 function sid(x){return x.id==null?'none':String(x.id)}
+function trkOwn(s){return s.scans.some(function(x){return x.id!=null})}
+/* The list is grouped by scan unless the viewer chose one scan or one list. */
+function trkGrouped(s){return TRK.group&&!TRK.scan&&trkOwn(s)}
 function trkLoad(quiet){
   var my=++TRK.seq;
-  return Promise.all([api('/api/tracker'),api('/api/tracker/targets?'+trkParams({limit:TRK.shown}))]).then(function(d){
+  return api('/api/tracker').then(function(s){
     if(my!==TRK.seq)return;
     /* The scan being shown was removed. */
-    if(TRK.scan&&!d[0].scans.some(function(x){return sid(x)===TRK.scan})){TRK.scan='';return trkLoad(quiet)}
-    TRK.sum=d[0];TRK.rows=d[1].rows;TRK.count=d[1].count;TRK.counts=d[1].counts;
-    var shown=new Set(TRK.rows.map(function(r){return r.id}));TRK.sel.forEach(function(id){if(!shown.has(id))TRK.sel.delete(id)});
-    trkRender();
+    if(TRK.scan&&!s.scans.some(function(x){return sid(x)===TRK.scan}))TRK.scan='';
+    return (trkGrouped(s)?trkGroups(s):api('/api/tracker/targets?'+trkParams({limit:TRK.shown}))).then(function(d){
+      if(my!==TRK.seq)return;
+      TRK.sum=s;TRK.groups=d.groups||null;TRK.rows=d.rows;TRK.count=d.count;TRK.counts=d.counts;
+      var shown=new Set(TRK.rows.map(function(r){return r.id}));TRK.sel.forEach(function(id){if(!shown.has(id))TRK.sel.delete(id)});
+      trkRender();
+    });
   }).catch(function(e){if(!quiet)fail(e)});
+}
+/* The scans with addresses that match the search and tile, and the rows of the open ones. Groups stay
+   as the viewer left them; the others open when there are few enough matches to show them all. */
+function trkGroups(s){
+  var b=TRK.bucket||'all';
+  return (TRK.q?api('/api/tracker/groups?'+new URLSearchParams({q:TRK.q})):Promise.resolve({groups:s.scans,counts:s.counts})).then(function(f){
+    var n={};f.groups.forEach(function(x){n[sid(x)]=x.counts[b]});
+    var gs=s.scans.filter(function(x){return n[sid(x)]}).map(function(x){return {key:sid(x),scan:x,n:n[sid(x)],rows:[]}}),
+        total=gs.reduce(function(t,g){return t+g.n},0),auto=gs.length===1||!!(TRK.q||TRK.bucket)&&total<=PAGE;
+    gs.forEach(function(g){g.open=g.key in TRK.open?TRK.open[g.key]:auto});
+    return Promise.all(gs.map(function(g){return g.open&&api('/api/tracker/targets?'+trkParams({scan:g.key,limit:TRK.gshown[g.key]||PAGE})).then(function(d){g.rows=d.rows;g.n=d.count})})).then(function(){
+      return {groups:gs,rows:[].concat.apply([],gs.map(function(g){return g.rows})),count:total,counts:f.counts}});
+  });
 }
 function trkStatus(s){
   var hb=s.heartbeat,live=hb&&Date.now()/1000-hb<150,cy=s.cycle,st=s.selfTest||{},pl=s.paced,out=[],warn=[];
@@ -347,8 +369,9 @@ function trkRender(){
 /* ---- scans ---- */
 function cnt(id,b,n){return n?'<button type="button" class="lnk" data-sb="'+id+'|'+b+'" title="Show these addresses">'+fmt(n)+'</button>':'<span class="dim">0</span>'}
 function trkScans(){
-  var sc=TRK.sum.scans,own=sc.some(function(x){return x.id!=null});
-  $('trk-scans').hidden=!own;$('trk-scan').hidden=!own;
+  var sc=TRK.sum.scans,own=trkOwn(TRK.sum);
+  $('trk-scans').hidden=!own;$('trk-scan').hidden=!own;$('trk-grp').hidden=!own||!!TRK.scan;
+  document.querySelectorAll('[data-tgrp]').forEach(function(b){b.setAttribute('aria-pressed',String((b.dataset.tgrp==='1')===TRK.group))});
   $('trk-scan').innerHTML='<option value="">All scans</option>'+sc.map(function(x){return '<option value="'+sid(x)+'"'+(TRK.scan===sid(x)?' selected':'')+'>'+esc(x.name)+'</option>'}).join('');
   if(!own)return;
   var sil=TRK.sum.silent,now=Date.now()/1000;
@@ -381,28 +404,47 @@ function trkScanSet(el){
 /* ---- addresses ---- */
 var TCOLS=[['ip','IP address'],['status','Status'],['reply','Last reply'],['last','Last check'],['uptime','Uptime'],['','Recent checks'],['every','Every'],['scan','Scan'],['host','Host'],['bld','Building'],['room','Room'],['owner','Owner'],['label','Label'],['added','Tracked since']];
 function ticks(x){return x?'<span class="ticks" title="Last '+x.length+' checks, oldest first">'+x.split('').map(function(c){return '<i class="'+(c==='1'?'u':'d')+'"></i>'}).join('')+'</span>':'<span class="dim">–</span>'}
+function allSel(rows){return rows.length>0&&rows.every(function(r){return TRK.sel.has(r.id)})}
+/* "Showing n of …" with buttons for the next page and for all; attr is set to pre+'1' or pre+'all'. */
+function more(n,left,attr,pre){pre=pre||'';return '<span>Showing '+fmt(n)+' of '+fmt(n+left)+'</span><button class="btn sm" type="button" '+attr+'="'+pre+'1">Show '+fmt(Math.min(PAGE,left))+' more</button><button class="btn sm" type="button" '+attr+'="'+pre+'all">Show all</button>'}
 function trkTable(){
-  var rows=TRK.rows,all=rows.length>0&&rows.every(function(r){return TRK.sel.has(r.id)});
-  $('trk-tbl').tHead.innerHTML='<tr><th class="ck"><input type="checkbox" data-tsel="all" aria-label="Select all shown"'+(all?' checked':'')+'></th>'+TCOLS.map(function(c){return c[0]?'<th data-ts="'+c[0]+'" tabindex="0"'+(TRK.sort.k===c[0]?' aria-sort="'+(TRK.sort.d>0?'ascending':'descending')+'"':'')+'>'+c[1]+'</th>':'<th class="ns">'+c[1]+'</th>'}).join('')+'</tr>';
-  $('trk-tbl').tBodies[0].innerHTML=rows.map(function(r){var on=TRK.sel.has(r.id);
+  /* Grouped, the scan is in each group's header instead of a column. */
+  var rows=TRK.rows,gs=TRK.groups,cols=TCOLS.filter(function(c){return !gs||c[0]!=='scan'});
+  $('trk-tbl').tHead.innerHTML='<tr><th class="ck"><input type="checkbox" data-tsel="all" aria-label="Select all shown"'+(allSel(rows)?' checked':'')+'></th>'+cols.map(function(c){return c[0]?'<th data-ts="'+c[0]+'" tabindex="0"'+(TRK.sort.k===c[0]?' aria-sort="'+(TRK.sort.d>0?'ascending':'descending')+'"':'')+'>'+c[1]+'</th>':'<th class="ns">'+c[1]+'</th>'}).join('')+'</tr>';
+  function row(r){var on=TRK.sel.has(r.id);
     return '<tr data-tid="'+r.id+'"'+(on?' class="sel"':'')+'><td class="ck"><input type="checkbox" data-tsel="'+r.id+'" aria-label="Select '+esc(r.ip)+'"'+(on?' checked':'')+'></td>'+
      '<td><span class="mono">'+esc(r.ip)+'</span></td><td>'+pillSt(r.status,r.silent)+'</td><td>'+rel(r.lastUpAt,'never')+'</td>'+
      '<td>'+rel(r.lastAt,'not yet')+(r.lastUp&&r.lastRtt!=null?' <span class="dim mono">'+ms(r.lastRtt)+'</span>':'')+'</td>'+
      '<td class="mono">'+(r.checks?Math.round(r.ups/r.checks*100)+'%':'<span class="dim">–</span>')+'</td><td>'+ticks(r.recent)+'</td>'+
-     '<td>'+esc(r.everyLabel.replace(/^Every /,''))+(r.paced?' <span class="dim">· paced</span>':'')+'</td><td>'+dim(r.scan)+'</td><td>'+dim(r.host)+'</td><td>'+dim(r.bld)+'</td><td>'+dim(r.room.replace(/^[^·]*· /,''))+'</td>'+
-     '<td>'+dim(r.owner)+'</td><td>'+dim(r.label)+'</td><td class="mono">'+esc(when(r.addedAt).slice(0,10))+'</td></tr>'}).join('');
+     '<td>'+esc(r.everyLabel.replace(/^Every /,''))+(r.paced?' <span class="dim">· paced</span>':'')+'</td>'+(gs?'':'<td>'+dim(r.scan)+'</td>')+'<td>'+dim(r.host)+'</td><td>'+dim(r.bld)+'</td><td>'+dim(r.room.replace(/^[^·]*· /,''))+'</td>'+
+     '<td>'+dim(r.owner)+'</td><td>'+dim(r.label)+'</td><td class="mono">'+esc(when(r.addedAt).slice(0,10))+'</td></tr>'}
+  $('trk-tbl').tBodies[0].innerHTML=gs?gs.map(function(g){var left=g.n-g.rows.length;
+    return trkGroupHead(g,cols.length)+(g.open?g.rows.map(row).join('')+(left>0?'<tr class="trk-gp"><td colspan="'+(cols.length+1)+'"><div class="trk-gb">'+more(g.rows.length,left,'data-tgpg',g.key+'|')+'</div></td></tr>':''):'')}).join(''):rows.map(row).join('');
   var e=$('trk-empty');e.hidden=TRK.count>0;e.textContent=TRK.sum.counts.all?'No tracked addresses match.':'Nothing is tracked yet. Start a scan above, or filter the Explorer and click Track these IPs.';
   var left=TRK.count-rows.length;
-  $('trk-pager').innerHTML=left>0?'<span>Showing '+fmt(rows.length)+' of '+fmt(TRK.count)+'</span><button class="btn sm" type="button" data-tpg="1">Show '+fmt(Math.min(PAGE,left))+' more</button><button class="btn sm" type="button" data-tpg="all">Show all</button>':'';
+  $('trk-pager').innerHTML=!gs&&left>0?more(rows.length,left,'data-tpg'):'';
   trkBulk();
 }
+/* A group's header row: the scan, how many of its addresses match, how the whole scan is doing and
+   its schedule. Clicking it opens or closes the group. */
+function trkGroupHead(g,span){
+  var x=g.scan,c=x.counts,st=TRK.sum.statuses,on=g.open&&allSel(g.rows),filtered=TRK.q||TRK.bucket;
+  var pills=['up','down','s30','pending','paused'].filter(function(k){return c[k]}).map(function(k){return '<span class="pill"><span class="dot" style="background:var(--t-'+k+')"></span>'+fmt(c[k])+' '+esc(st[k].toLowerCase())+'</span>'});
+  return '<tr class="trk-gh'+(g.open?' open':'')+'" data-gid="'+g.key+'"><td class="ck">'+(g.open&&g.rows.length?'<input type="checkbox" data-tsel="g:'+g.key+'" aria-label="Select the addresses shown in '+esc(x.name)+'"'+(on?' checked':'')+'>':'')+'</td>'+
+   '<td colspan="'+span+'"><div class="trk-gb"><button type="button" class="trk-gt" aria-expanded="'+g.open+'"><span class="ch" aria-hidden="true">▶</span>'+esc(x.name)+'</button>'+
+   (x.spec&&x.spec!==x.name?'<span class="dim mono trk-gs" title="'+esc(x.spec)+'">'+esc(x.spec)+'</span>':'')+
+   '<b class="trk-gn">'+(filtered?fmt(g.n)+' of '+fmt(c.all)+' match':fmt(c.all)+' address'+(c.all===1?'':'es'))+'</b>'+pills.join('')+
+   (x.id!=null?'<span class="dim">'+esc(x.everyLabel)+(x.paced?', paced':'')+(x.paused?' · paused':'')+'</span>':'')+'</div></td></tr>';
+}
 function trkBulk(){$('trk-bulk').hidden=!TRK.sel.size;$('trk-nsel').textContent=fmt(TRK.sel.size)+' selected';trkDisarm()}
+function trkGroup(key){return (TRK.groups||[]).filter(function(g){return g.key===key})[0]}
 function trkSelect(t){
-  var v=t.dataset.tsel;
-  if(v==='all'){TRK.rows.forEach(function(r){if(t.checked)TRK.sel.add(r.id);else TRK.sel.delete(r.id)});trkTable();return}
+  var v=t.dataset.tsel,g=v.indexOf('g:')===0&&trkGroup(v.slice(2));
+  if(v==='all'||g){(g?g.rows:TRK.rows).forEach(function(r){if(t.checked)TRK.sel.add(r.id);else TRK.sel.delete(r.id)});trkTable();return}
   if(t.checked)TRK.sel.add(+v);else TRK.sel.delete(+v);
   t.closest('tr').classList.toggle('sel',t.checked);
-  document.querySelector('[data-tsel="all"]').checked=TRK.rows.every(function(r){return TRK.sel.has(r.id)});trkBulk();
+  document.querySelector('[data-tsel="all"]').checked=allSel(TRK.rows);
+  (TRK.groups||[]).forEach(function(x){var b=document.querySelector('[data-tsel="g:'+x.key+'"]');if(b)b.checked=allSel(x.rows)});trkBulk();
 }
 /* Removing asks for a second click on the same button instead of a browser confirm. */
 function arm(b,label){
@@ -541,9 +583,12 @@ document.addEventListener('click',function(e){
   var sb=t.closest('[data-sb]');if(sb){trkScanFilter(sb);return}
   var sa=t.closest('[data-sact]');if(sa){trkScanAct(sa);return}
   var ts=t.closest('th[data-ts]');if(ts){var tk=ts.dataset.ts;if(TRK.sort.k===tk)TRK.sort.d=-TRK.sort.d;else TRK.sort={k:tk,d:1};trkLoad();return}
-  var ck=t.closest('.ck');if(ck){if(t.tagName!=='INPUT')ck.querySelector('input').click();return}
+  var ck=t.closest('.ck'),ci=ck&&ck.querySelector('input');if(ci){if(t!==ci)ci.click();return}
+  var gh=t.closest('tr[data-gid]');if(gh){TRK.open[gh.dataset.gid]=gh.classList.toggle('open');trkLoad();return}
   var ttr=t.closest('tr[data-tid]');if(ttr){trkOpen(+ttr.dataset.tid);return}
   var tp=t.closest('[data-tpg]');if(tp){TRK.shown=tp.dataset.tpg==='all'?TRK.count:TRK.shown+PAGE;trkLoad();return}
+  var gp=t.closest('[data-tgpg]');if(gp){var p=gp.dataset.tgpg.split('|'),g=trkGroup(p[0]);if(g){TRK.gshown[g.key]=p[1]==='all'?g.n:g.rows.length+PAGE;trkLoad()}return}
+  var tg=t.closest('[data-tgrp]');if(tg){TRK.group=tg.dataset.tgrp==='1';try{localStorage.setItem('ipx-trk-group',TRK.group?'scan':'list')}catch(er){}TRK.shown=PAGE;trkLoad();return}
   var bu=t.closest('[data-bulk]');if(bu){trkBulkAct(bu);return}
   var ta=t.closest('[data-tact]');if(ta){trkAct(ta);return}
   var to=t.closest('[data-topen]');if(to){closeAll();showSection('trk');trkOpen(+to.dataset.topen);return}
@@ -613,7 +658,7 @@ syncTheme();
 window.addEventListener('resize',setTop);
 
 /* ---------- init ---------- */
-try{SHOWCH=localStorage.getItem('ipx-charts')!=='off'}catch(e){}
+try{SHOWCH=localStorage.getItem('ipx-charts')!=='off';TRK.group=localStorage.getItem('ipx-trk-group')!=='list'}catch(e){}
 $('chtog').setAttribute('aria-pressed',String(SHOWCH));
 api('/api/meta').then(function(m){setupMeta(m);buildFacets();renderSrcs();showSection(location.hash==='#tracker'?'trk':'exp')}).catch(fail);
 setInterval(function(){if(SECTION==='trk'&&!document.hidden)trkLoad(true)},30000);

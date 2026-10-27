@@ -66,6 +66,8 @@ You can also start a scan from the Explorer: filter to the assets you want, for 
 
 The **Scans** table lists each scan with its counts: how many addresses answered, how many didn't, and how many are in each no-reply bucket. Click a number to list those addresses. From the table you can change a scan's interval or pacing, check it now, pause it, or remove it with its history. An address belongs to one scan at most. If a new scan includes addresses you track on their own, they join it and take its settings. Addresses that are already in another scan stay there. Removing a scan stops tracking all of its addresses, including ones that joined it.
 
+**Tracked addresses** lists the addresses under their scans. Each scan has a row with its name, what it covers, how many addresses it has and how they are doing. Click the row to open the scan and list its addresses, 200 at a time. A search or a tile shows how many addresses match in each scan and hides the scans with no matches. When there are 200 matches or fewer, the scans open on their own. Click **One list** to list every address together, or choose a scan from the menu to list only its addresses.
+
 ### How an address is checked
 
 A check pings the address with [fping](https://fping.org/). If there is no answer, it tries a TCP connection to ports 80, 443, 22, 445 and 3389. A connection or a refusal both count as alive, as with `nmap -sn`. Click an address to see its profile: uptime, last reply, a 180-day availability strip and recent checks.

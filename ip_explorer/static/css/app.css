@@ -331,6 +331,23 @@ input.inp{width:220px;max-width:100%}
 #trk-tbl th.ck,#trk-tbl td.ck{width:34px;padding-right:0;cursor:default}
 #trk-tbl th.ns{cursor:default}
 #trk-tbl tbody tr.sel td{background:var(--accent-soft)}
+.seg.sm button{height:28px;padding:0 10px;font-size:12px}
+/* Grouped by scan: a header row per scan, then its addresses when open. The header's content stays in
+   view when the table scrolls sideways. */
+#trk-tbl tr.trk-gh td{background:var(--surface2);vertical-align:middle;padding-block:8px}
+#trk-tbl tbody tr.trk-gh:hover td{background:var(--accent-soft)}
+.trk-gb{position:sticky;left:11px;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;width:max-content;max-width:calc(100vw - 96px);white-space:normal}
+.trk-gt{border:0;background:transparent;padding:0;font-weight:600;font-size:13.5px;text-align:left}
+.trk-gt .ch{display:inline-block;margin-right:8px;color:var(--muted);font-size:10px;transition:transform .15s}
+.trk-gh.open .trk-gt .ch{transform:rotate(90deg)}
+.trk-gh:hover .trk-gt{color:var(--accent)}
+.trk-gs{font-size:12px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk-gn{font-weight:500;font-variant-numeric:tabular-nums}
+.trk-gh .pill{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.trk-gh .dot{width:8px;height:8px}
+#trk-tbl tr.trk-gp{cursor:default}
+#trk-tbl tbody tr.trk-gp:hover td{background:transparent}
+.trk-gp .trk-gb{gap:10px;color:var(--muted);padding-left:34px}
 .ticks{display:inline-flex;gap:2px;vertical-align:middle}
 .ticks i{width:5px;height:14px;border-radius:2px;background:var(--t-up)}
 .ticks i.d{background:var(--t-down)}
