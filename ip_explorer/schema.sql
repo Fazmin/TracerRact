@@ -82,7 +82,19 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 -- IP tracker (see tracker.py): addresses checked on a schedule. Times are Unix seconds (UTC).
--- next_at 0 means check as soon as possible; last_* describe the latest check.
+-- A scan is a set of addresses added together, such as a /24, with one schedule for all of them.
+CREATE TABLE IF NOT EXISTS track_scans (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  spec TEXT NOT NULL DEFAULT '',            -- what was entered, e.g. 130.113.10.0/24
+  every INTEGER NOT NULL,
+  paced INTEGER NOT NULL DEFAULT 0,
+  paused INTEGER NOT NULL DEFAULT 0,
+  added_at INTEGER NOT NULL
+);
+
+-- next_at 0 means check as soon as possible; last_* describe the latest check. Addresses tracked on
+-- their own have no scan. db.migrate adds scan_id and paced to tables made before they existed.
 CREATE TABLE IF NOT EXISTS track_targets (
   id INTEGER PRIMARY KEY,
   ip TEXT NOT NULL UNIQUE,
@@ -95,10 +107,13 @@ CREATE TABLE IF NOT EXISTS track_targets (
   last_at INTEGER, last_up INTEGER, last_up_at INTEGER, last_rtt REAL,
   last_via TEXT NOT NULL DEFAULT '',
   checks INTEGER NOT NULL DEFAULT 0,
-  ups INTEGER NOT NULL DEFAULT 0
+  ups INTEGER NOT NULL DEFAULT 0,
+  scan_id INTEGER REFERENCES track_scans (id) ON DELETE CASCADE,
+  paced INTEGER NOT NULL DEFAULT 0          -- checked one at a time, a random gap apart
 );
 CREATE INDEX IF NOT EXISTS idx_track_targets_due ON track_targets (paused, next_at);
 CREATE INDEX IF NOT EXISTS idx_track_targets_n ON track_targets (n);
+CREATE INDEX IF NOT EXISTS idx_track_targets_scan ON track_targets (scan_id);
 
 -- One row per check of a tracked address.
 CREATE TABLE IF NOT EXISTS track_checks (

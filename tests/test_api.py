@@ -81,6 +81,14 @@ def test_buildings_rooms_and_search(loaded):
     assert k['facets']['cov']['items'] == [['Both', 4], ['runZero only', 6], ['BlueCat only', 4]]
 
 
+def test_sort_by_text_column(loaded):
+    # Natural order (BAS-6 before BAS-10), empty values last.
+    def hosts(d):
+        return [r['host'] for r in loaded.get(f'/api/explore?limit=all&sort=host&dir={d}&cols=host').get_json()['rows']]
+    up = hosts(1)
+    assert up[:3] == ['BAS-5', 'BAS-6', 'BAS-10'] and up[-1] == '' and hosts(-1) == up[::-1]
+
+
 def test_every_address_connects(loaded):
     """Scope and extra IPs match BlueCat, link further BlueCat addresses, place assets and are searchable."""
     def find(q):

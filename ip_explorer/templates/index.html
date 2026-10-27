@@ -61,17 +61,25 @@
 
 <div class="trk" id="trk" hidden>
   <div class="trk-st" id="trk-st"></div>
-  <section class="kpis" id="trk-kpis" aria-label="Tracked addresses by status"></section>
   <section class="card trk-add" aria-labelledby="trk-add-t">
-    <h3 id="trk-add-t">Track addresses</h3>
-    <p>Enter IP addresses, CIDR blocks such as <code>130.113.10.0/24</code> or ranges such as <code>130.113.10.5-130.113.10.40</code>, separated by spaces or new lines. You can also filter the Explorer and click <b>Track these IPs</b>.</p>
-    <textarea id="trk-ips" rows="2" aria-label="Addresses to track" placeholder="130.113.10.20  130.113.12.0/28"></textarea>
-    <div class="trk-row"><label>Check <select class="inp" id="trk-every"></select></label><input class="inp" id="trk-label" type="text" maxlength="200" aria-label="Label" placeholder="Label (optional)"><button class="btn primary" id="trk-go" type="button">Start tracking</button><span class="dim" id="trk-addmsg"></span></div>
+    <h3 id="trk-add-t">New scan</h3>
+    <p>Enter a CIDR block such as <code>130.113.10.0/24</code>, a range such as <code>130.113.10.5-130.113.10.40</code> or single IP addresses, separated by spaces or new lines. Every address in the scan is checked on its schedule, and the tracker records whether it answered. You can also filter the Explorer and click <b>Track these IPs</b>.</p>
+    <textarea id="trk-ips" rows="2" aria-label="Addresses to scan" placeholder="130.113.10.0/24  130.113.12.5-130.113.12.40"></textarea>
+    <div class="trk-row"><input class="inp" id="trk-label" type="text" maxlength="200" aria-label="Scan name" placeholder="Scan name (optional)"><label>Check <select class="inp" id="trk-every"></select></label><label><input type="checkbox" id="trk-paced"><span>Pace the checks: one address at a time, a random <span id="trk-gap">0.5–4 s</span> apart</span></label><button class="btn primary" id="trk-go" type="button">Start scan</button></div>
+    <div class="trk-est dim" id="trk-est"></div>
+    <div class="trk-est" id="trk-addmsg" role="status"></div>
   </section>
+  <section class="trk-scans" id="trk-scans" aria-labelledby="trk-scans-t" hidden>
+    <h2 id="trk-scans-t">Scans</h2>
+    <div class="tw"><table id="trk-stbl"><thead></thead><tbody></tbody></table></div>
+  </section>
+  <section class="kpis" id="trk-kpis" aria-label="Tracked addresses by status"></section>
+  <section class="trk-silent" aria-labelledby="trk-silent-t"><h3 id="trk-silent-t">No reply for</h3><div class="kpis" id="trk-silent"></div></section>
   <div class="vbar">
     <h2 id="trk-vt">Tracked addresses</h2>
+    <select class="inp sm" id="trk-scan" aria-label="Show the addresses of one scan" hidden></select>
     <label class="search trk-search" for="trk-q"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="trk-q" type="search" autocomplete="off" aria-label="Filter tracked addresses" placeholder="Filter by IP, CIDR, host, room, owner or label"></label>
+      <input id="trk-q" type="search" autocomplete="off" aria-label="Filter tracked addresses" placeholder="Filter by IP, CIDR, scan, host, room, owner or label"></label>
     <span class="sp"></span>
     <div class="trk-bulk" id="trk-bulk" hidden><b id="trk-nsel"></b><select class="inp sm" id="trk-bevery" aria-label="Interval for the selected addresses"></select><button class="btn sm" type="button" data-bulk="every">Set interval</button><button class="btn sm" type="button" data-bulk="check">Check now</button><button class="btn sm" type="button" data-bulk="pause">Pause</button><button class="btn sm" type="button" data-bulk="resume">Resume</button><button class="btn sm danger" type="button" data-bulk="remove">Stop tracking</button></div>
     <button class="btn sm" id="trk-dl" type="button">Download CSV</button>
@@ -91,14 +99,14 @@
   <header><h2 id="about-t">About</h2><span class="sp"></span><button class="x" type="button" data-close aria-label="Close">×</button></header>
   <div class="dlg-b">
     <p>IP Asset Explorer combines a BlueCat IPAM export with a runZero asset export, so you can search and filter every address by building, room, owner, device type, risk and open ports in one place.</p>
-    <p>The IP Tracker checks the addresses you choose on a schedule and lists the ones that have not answered for 90 days, so you can see which addresses may no longer be in use.</p>
+    <p>The IP Tracker checks the addresses and ranges you choose on a schedule and groups the ones that stop answering by how long they have been silent (30, 60 and 90 days, 6 and 12 months), so you can see which addresses may no longer be in use.</p>
     <p>Built by Fazmin Nizam. This is an experimental tool, so check anything important against BlueCat or runZero.</p>
   </div>
 </div>
 <div class="dlg sm" id="trkdlg" role="dialog" aria-modal="true" aria-labelledby="trkdlg-t" hidden>
   <header><h2 id="trkdlg-t">Track these IPs</h2><span class="sp"></span><button class="x" type="button" data-close aria-label="Close">×</button></header>
   <div class="dlg-b" id="trkdlg-b"></div>
-  <footer><span class="sp"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" id="trkdlg-go" type="button">Start tracking</button></footer>
+  <footer><span class="sp"></span><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" id="trkdlg-go" type="button">Start scan</button></footer>
 </div>
 <div class="toast" id="toast" role="status"></div>
 

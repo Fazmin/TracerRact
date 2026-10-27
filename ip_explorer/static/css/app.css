@@ -281,7 +281,10 @@ details summary{cursor:pointer;color:var(--accent);padding:4px 0}
 }
 
 /* IP tracker. Status colours follow the theme through the tokens they point at. */
-:root{--t-up:var(--ok); --t-down:var(--r-high); --t-unused:var(--r-crit); --t-pending:var(--r-none); --t-paused:var(--r-low)}
+:root{--t-up:var(--ok); --t-down:var(--r-high); --t-pending:var(--r-none); --t-paused:var(--r-low);
+  /* No reply for 30+ days ... 12+ months: from the down colour to the critical one, then towards the text colour. */
+  --t-s30:color-mix(in srgb,var(--r-crit) 35%,var(--r-high)); --t-s60:color-mix(in srgb,var(--r-crit) 70%,var(--r-high));
+  --t-s90:var(--r-crit); --t-s180:color-mix(in srgb,var(--r-crit) 70%,var(--ink)); --t-s365:color-mix(in srgb,var(--r-crit) 45%,var(--ink))}
 .top-row .seg button{height:32px}
 .trk{margin-top:12px;min-width:0}
 .trk-line{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;color:var(--muted);font-size:12.5px}
@@ -295,6 +298,26 @@ details summary{cursor:pointer;color:var(--accent);padding:4px 0}
 .trk-add textarea{display:block;width:100%;min-height:52px;resize:vertical;font:12.5px/1.5 var(--mono);color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
 .trk-row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-top:8px}
 .trk-row label{display:inline-flex;gap:8px;align-items:center;color:var(--muted)}
+.trk-row input[type=checkbox]{margin:0}
+.trk-est{margin-top:6px;font-size:12.5px}
+.trk-est:empty{display:none}
+.trk-est b{color:var(--ink)}
+.trk-scans{margin-top:14px}
+.trk-scans h2{font-size:15px;margin:0 0 8px;font-weight:600}
+.trk-scans .tw{max-height:min(420px,60vh)}
+#trk-stbl td{vertical-align:middle}
+#trk-stbl tbody tr{cursor:default}
+#trk-stbl tbody tr.sel td{background:var(--accent-soft)}
+#trk-stbl th{cursor:default}
+#trk-stbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.trk-spec{font-size:11.5px;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.trk-sacts{display:inline-flex;gap:6px}
+.lnk{background:none;border:0;padding:0;color:var(--accent);text-align:left}
+.lnk:hover{text-decoration:underline}
+.trk-silent{margin-top:12px}
+.trk-silent h3{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.trk-silent .kpis{margin-top:6px}
+.trk-note{margin:0 0 4px;font-size:12.5px}
 .inp{height:34px;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:0 10px}
 .inp.sm{height:28px;font-size:12px;padding:0 8px;border-radius:6px}
 input.inp{width:220px;max-width:100%}

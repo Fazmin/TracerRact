@@ -97,5 +97,5 @@ def order_by(col, direction):
     if col.kind == 'num':
         return f'{col.sort} {d}, {tail}', list(col.sort_params)
     # Empty values sort after everything ascending (the original used U+FFFF for them).
-    return (f"({col.sort} = '') {d}, {col.sort} COLLATE NATURAL {d}, {tail}",
+    return (f"({col.sort} = '') {d}, {col.sort} COLLATE \"NATURAL\" {d}, {tail}",
             list(col.sort_params) * 2)

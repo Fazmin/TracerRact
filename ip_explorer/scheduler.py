@@ -5,6 +5,7 @@ process check at a time; if it stops, another takes over once the lease runs out
 """
 import logging
 import os
+import random
 import socket
 import threading
 import time
@@ -75,34 +76,44 @@ def cycle(db, owner):
     return res
 
 
+def gap():
+    """The random pause before the next paced check."""
+    return random.uniform(*tracker.PACE_GAP)
+
+
 def run(path, once=False):
-    """The loop: every TICK, if this process holds the lease, run the self-test when it is due and check
-    whatever is due."""
+    """The loop. Every TICK, if this process holds the lease, it runs the self-test when that is due
+    and checks whatever is due that is not paced. Between ticks it checks due paced addresses one at a
+    time, a random gap() apart. With once, it does one tick and the paced addresses due then."""
     owner = _owner()
-    leader, tested = False, 0
+    leader, tested, next_tick = False, 0, 0
     while True:
-        pause = TICK
+        paced = False
         try:
             db = connect(path)
             try:
-                now = int(time.time())
-                if take_lease(db, owner, now):
-                    if not leader:
-                        log.info('IP tracker: checks run in this process (%s).', owner)
-                        tested = 0
-                    leader = True
-                    if now - tested >= SELF_TEST_EVERY:
-                        self_test(db)
-                        tested = now
-                    cycle(db, owner)
-                else:
-                    leader = False
+                if time.time() >= next_tick:
+                    now = int(time.time())
+                    next_tick = now + TICK
+                    if take_lease(db, owner, now):
+                        if not leader:
+                            log.info('IP tracker: checks run in this process (%s).', owner)
+                            tested = 0
+                        leader = True
+                        if now - tested >= SELF_TEST_EVERY:
+                            self_test(db)
+                            tested = now
+                        cycle(db, owner)
+                    else:
+                        leader = False
+                paced = leader and tracker.run_paced(db, tracker.prober(db)) is not None
             finally:
                 db.close()
+            pause = gap() if paced else max(1, next_tick - time.time())
         except Exception:
             log.exception('IP tracker: check cycle failed; trying again in %d minutes.', ERROR_PAUSE // 60)
             pause = ERROR_PAUSE
-        if once:
+        if once and not paced:
             return
         time.sleep(pause)
 

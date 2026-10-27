@@ -285,35 +285,45 @@ function resetKind(kind){IMP.busy=true;renderImp();
 
 /* ---------- IP tracker ---------- */
 var SECTION='exp';
-var TRK={sum:null,rows:[],count:0,bucket:'',q:'',sort:{k:'ip',d:1},shown:200,sel:new Set(),seq:0,arm:null};
+var TRK={sum:null,rows:[],count:0,counts:null,bucket:'',scan:'',q:'',sort:{k:'ip',d:1},shown:200,sel:new Set(),seq:0,arm:null};
+/* Seconds a paced check of an address that does not answer can take: ping and its retry, then the TCP ports. */
+var PROBE_MAX=7.5;
 function pad(n){return (n<10?'0':'')+n}
 function dayKey(x){return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())}
 function when(t){if(!t)return '';var d=new Date(t*1000);return dayKey(d)+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
 function ago(t){var s=Math.max(0,Date.now()/1000-t);return s<90?'just now':s<5400?Math.round(s/60)+' min ago':s<129600?Math.round(s/3600)+' h ago':fmt(Math.round(s/86400))+' days ago'}
 function rel(t,none){return t?'<span title="'+esc(when(t))+'">'+ago(t)+'</span>':'<span class="dim">'+none+'</span>'}
+function dur(s){return s<90?Math.round(s)+' s':s<5400?Math.round(s/60)+' min':(s/3600).toFixed(1).replace(/\.0$/,'')+' h'}
 function ms(v){return v==null?'':(v<10?v.toFixed(1):Math.round(v))+' ms'}
 function viaText(v){return v==='icmp'?'ping':String(v||'').replace('tcp/','TCP port ').replace(' refused',' (refused)')}
-function pillSt(s){return '<span class="pill"><span class="dot" style="background:var(--t-'+s+')"></span>'+esc(TRK.sum.statuses[s]||s)+'</span>'}
+/* A down address that has gone 30+ days without a reply shows its silence bucket instead. */
+function stKey(s,silent){return s==='down'&&silent?'s'+silent:s}
+function pillSt(s,silent){var k=stKey(s,silent);return '<span class="pill"><span class="dot" style="background:var(--t-'+k+')"></span>'+esc(TRK.sum.statuses[k]||k)+'</span>'}
 function everyOpts(sel){return TRK.sum.intervals.map(function(i){return '<option value="'+i.k+'"'+(i.k===sel?' selected':'')+'>'+esc(i.l)+'</option>'}).join('')}
 function everyKey(secs){var m=TRK.sum.intervals.filter(function(i){return i.s===secs})[0];return m?m.k:''}
+function gapText(){var g=TRK.sum.paceGap;return g[0]+'–'+g[1]+' s'}
 function trkMeta(){return TRK.sum?Promise.resolve(TRK.sum):api('/api/tracker').then(function(s){TRK.sum=s;return s})}
 function trkParams(extra){
-  var p=new URLSearchParams();if(TRK.bucket)p.set('bucket',TRK.bucket);if(TRK.q)p.set('q',TRK.q);
+  var p=new URLSearchParams();if(TRK.bucket)p.set('bucket',TRK.bucket);if(TRK.scan)p.set('scan',TRK.scan);if(TRK.q)p.set('q',TRK.q);
   p.set('sort',TRK.sort.k);p.set('dir',String(TRK.sort.d));Object.keys(extra||{}).forEach(function(k){p.set(k,extra[k])});return p.toString()}
+function sid(x){return x.id==null?'none':String(x.id)}
 function trkLoad(quiet){
   var my=++TRK.seq;
   return Promise.all([api('/api/tracker'),api('/api/tracker/targets?'+trkParams({limit:TRK.shown}))]).then(function(d){
     if(my!==TRK.seq)return;
-    TRK.sum=d[0];TRK.rows=d[1].rows;TRK.count=d[1].count;
+    /* The scan being shown was removed. */
+    if(TRK.scan&&!d[0].scans.some(function(x){return sid(x)===TRK.scan})){TRK.scan='';return trkLoad(quiet)}
+    TRK.sum=d[0];TRK.rows=d[1].rows;TRK.count=d[1].count;TRK.counts=d[1].counts;
     var shown=new Set(TRK.rows.map(function(r){return r.id}));TRK.sel.forEach(function(id){if(!shown.has(id))TRK.sel.delete(id)});
     trkRender();
   }).catch(function(e){if(!quiet)fail(e)});
 }
 function trkStatus(s){
-  var hb=s.heartbeat,live=hb&&Date.now()/1000-hb<150,cy=s.cycle,st=s.selfTest||{},out=[],warn=[];
+  var hb=s.heartbeat,live=hb&&Date.now()/1000-hb<150,cy=s.cycle,st=s.selfTest||{},pl=s.paced,out=[],warn=[];
   out.push('<span><span class="trk-dot'+(live?' on':'')+'"></span>'+(live?'Background checks are running':'Background checks are not running'+(hb?' (last active '+ago(hb)+')':''))+'</span>');
   out.push('<span>Scanner: '+esc(s.scanner)+'</span>');
   if(cy&&!cy.error)out.push('<span>Last run '+ago(cy.at)+': '+fmt(cy.checked)+' checked, '+fmt(cy.up)+' answered</span>');
+  if(s.pacedDue||(pl&&Date.now()/1000-pl.at<900))out.push('<span>Paced checks: '+(s.pacedDue?fmt(s.pacedDue)+' waiting':'none waiting')+(pl?', last '+esc(pl.ip)+' '+ago(pl.at):'')+'</span>');
   if(s.counts.all&&s.nextAt!=null)out.push('<span>'+(s.nextAt<=Date.now()/1000?'Checks are due now':'Next check '+esc(when(s.nextAt)))+'</span>');
   if(!hb)warn.push('Checks run in the background while the app runs in Docker. For local development, run <code>flask --app ip_explorer tracker</code> as well.');
   if(cy&&cy.error)warn.push('<b>The last run failed:</b> '+esc(cy.error));
@@ -322,28 +332,66 @@ function trkStatus(s){
   if(st.icmp)warn.push('<b>Ping results are unreliable.</b> 192.0.2.1, an address that is never in use, answers ping from here, so addresses can look alive when they are not.');
   return '<div class="trk-line">'+out.join('')+'</div>'+warn.map(function(w){return '<div class="warn">'+w+'</div>'}).join('');
 }
-var TKPI=[['','All tracked'],['up','Up'],['down','Down'],['unused','Likely unused'],['pending','Waiting for first check'],['paused','Paused']];
+var TKPI=[['','All tracked'],['up','Up'],['down','Down'],['pending','Waiting for first check'],['paused','Paused']];
+function tile(b,label,n){return '<button type="button" class="kpi trk-k" data-bucket="'+b+'" aria-pressed="'+(TRK.bucket===b)+'"><div class="v">'+(b?'<span class="dot" style="background:var(--t-'+b+')"></span>':'')+fmt(n)+'</div><div class="l">'+esc(label)+'</div></button>'}
 function trkRender(){
-  var s=TRK.sum,c=s.counts;
+  var s=TRK.sum,c=TRK.counts;
   $('trk-st').innerHTML=trkStatus(s);
-  $('trk-kpis').innerHTML=TKPI.map(function(k){var b=k[0];return '<button type="button" class="kpi trk-k" data-bucket="'+b+'" aria-pressed="'+(TRK.bucket===b)+'"><div class="v">'+(b?'<span class="dot" style="background:var(--t-'+b+')"></span>':'')+fmt(c[b||'all'])+'</div><div class="l">'+k[1]+(b==='unused'?' · no reply '+s.unusedDays+'+ days':'')+'</div></button>'}).join('');
-  if(!$('trk-every').options.length){$('trk-every').innerHTML=everyOpts(s.defaultEvery);$('trk-bevery').innerHTML=everyOpts(s.defaultEvery)}
+  if(!$('trk-every').options.length){$('trk-every').innerHTML=everyOpts(s.defaultEvery);$('trk-bevery').innerHTML=everyOpts(s.defaultEvery);$('trk-gap').textContent=gapText()}
+  trkScans();
+  $('trk-kpis').innerHTML=TKPI.map(function(k){return tile(k[0],k[1],c[k[0]||'all'])}).join('');
+  $('trk-silent').innerHTML=s.silent.map(function(x){return tile(x.k,x.l,c[x.k])}).join('');
   $('trk-vt').textContent=(TRK.bucket?s.statuses[TRK.bucket]:'Tracked addresses')+' ('+fmt(TRK.count)+')';
   trkTable();
 }
-var TCOLS=[['ip','IP address'],['status','Status'],['reply','Last reply'],['last','Last check'],['uptime','Uptime'],['','Recent checks'],['every','Every'],['host','Host'],['bld','Building'],['room','Room'],['owner','Owner'],['label','Label'],['added','Tracked since']];
+/* ---- scans ---- */
+function cnt(id,b,n){return n?'<button type="button" class="lnk" data-sb="'+id+'|'+b+'" title="Show these addresses">'+fmt(n)+'</button>':'<span class="dim">0</span>'}
+function trkScans(){
+  var sc=TRK.sum.scans,own=sc.some(function(x){return x.id!=null});
+  $('trk-scans').hidden=!own;$('trk-scan').hidden=!own;
+  $('trk-scan').innerHTML='<option value="">All scans</option>'+sc.map(function(x){return '<option value="'+sid(x)+'"'+(TRK.scan===sid(x)?' selected':'')+'>'+esc(x.name)+'</option>'}).join('');
+  if(!own)return;
+  var sil=TRK.sum.silent,now=Date.now()/1000;
+  $('trk-stbl').tHead.innerHTML='<tr><th>Scan</th><th class="num">Addresses</th><th class="num">Up</th><th class="num">Down</th>'+
+   sil.map(function(x){return '<th class="num" title="No reply for '+esc(x.l)+'">'+(x===sil[0]?'No reply ':'')+esc(x.l)+'</th>'}).join('')+'<th>Every</th><th>Paced</th><th>Last check</th><th>Next check</th><th></th></tr>';
+  $('trk-stbl').tBodies[0].innerHTML=sc.map(function(x){
+    var id=sid(x),c=x.counts,real=x.id!=null;
+    var next=real&&x.paused?'<span class="dim">Paused</span>':x.due?(x.paced?fmt(x.due)+' waiting':'Due now'):x.nextAt?'<span title="'+esc(when(x.nextAt))+'">'+esc(when(x.nextAt))+'</span>':'<span class="dim">–</span>';
+    return '<tr data-sid="'+id+'"'+(TRK.scan===id?' class="sel"':'')+'><td class="w"><button type="button" class="lnk" data-sb="'+id+'|">'+esc(x.name)+'</button>'+(real&&x.spec&&x.spec!==x.name?'<div class="dim mono trk-spec" title="'+esc(x.spec)+'">'+esc(x.spec)+'</div>':'')+'</td>'+
+     '<td class="num">'+cnt(id,'',c.all)+'</td><td class="num">'+cnt(id,'up',c.up)+'</td><td class="num">'+cnt(id,'down',c.down)+'</td>'+
+     sil.map(function(t){return '<td class="num">'+cnt(id,t.k,c[t.k])+'</td>'}).join('')+
+     (real?'<td><select class="inp sm" data-sset="every" aria-label="How often to check '+esc(x.name)+'">'+everyOpts(everyKey(x.every))+'</select></td>'+
+       '<td><input type="checkbox" data-sset="paced" aria-label="Pace the checks of '+esc(x.name)+'"'+(x.paced?' checked':'')+'></td>':'<td class="dim">Set per address</td><td></td>')+
+     '<td>'+rel(x.lastAt,'not yet')+'</td><td>'+next+'</td>'+
+     '<td>'+(real?'<span class="trk-sacts"><button class="btn sm" type="button" data-sact="check">Check now</button><button class="btn sm" type="button" data-sact="'+(x.paused?'resume':'pause')+'">'+(x.paused?'Resume':'Pause')+'</button><button class="btn sm danger" type="button" data-sact="remove">Remove</button></span>':'')+'</td></tr>'}).join('');
+}
+function trkScanFilter(b){
+  var p=b.dataset.sb.split('|');TRK.scan=p[0];TRK.bucket=p[1];TRK.shown=PAGE;
+  trkLoad().then(function(){$('trk-kpis').scrollIntoView({block:'start',behavior:'smooth'})})}
+function trkScanAct(b){
+  var id=b.closest('tr').dataset.sid,a=b.dataset.sact,url='/api/tracker/scans/'+id;
+  if(a==='remove'){if(!arm(b,'Remove the scan and its history?'))return;
+    send(url,'DELETE').then(function(d){if(TRK.scan===id)TRK.scan='';trkDone('Scan removed. Stopped tracking '+fmt(d.removed)+' addresses')}).catch(fail);return}
+  if(a==='check'){b.disabled=true;send(url+'/check','POST').then(function(d){b.disabled=false;trkDone(checkMsg(d))}).catch(function(e){b.disabled=false;fail(e)});return}
+  send(url,'PATCH',{paused:a==='pause'}).then(function(){trkDone(a==='pause'?'Scan paused':'Scan resumed')}).catch(fail);
+}
+function trkScanSet(el){
+  var body={};body[el.dataset.sset]=el.type==='checkbox'?el.checked:el.value;
+  send('/api/tracker/scans/'+el.closest('tr').dataset.sid,'PATCH',body).then(function(d){trkDone('Saved for '+fmt(d.updated)+' addresses')}).catch(fail)}
+/* ---- addresses ---- */
+var TCOLS=[['ip','IP address'],['status','Status'],['reply','Last reply'],['last','Last check'],['uptime','Uptime'],['','Recent checks'],['every','Every'],['scan','Scan'],['host','Host'],['bld','Building'],['room','Room'],['owner','Owner'],['label','Label'],['added','Tracked since']];
 function ticks(x){return x?'<span class="ticks" title="Last '+x.length+' checks, oldest first">'+x.split('').map(function(c){return '<i class="'+(c==='1'?'u':'d')+'"></i>'}).join('')+'</span>':'<span class="dim">–</span>'}
 function trkTable(){
   var rows=TRK.rows,all=rows.length>0&&rows.every(function(r){return TRK.sel.has(r.id)});
   $('trk-tbl').tHead.innerHTML='<tr><th class="ck"><input type="checkbox" data-tsel="all" aria-label="Select all shown"'+(all?' checked':'')+'></th>'+TCOLS.map(function(c){return c[0]?'<th data-ts="'+c[0]+'" tabindex="0"'+(TRK.sort.k===c[0]?' aria-sort="'+(TRK.sort.d>0?'ascending':'descending')+'"':'')+'>'+c[1]+'</th>':'<th class="ns">'+c[1]+'</th>'}).join('')+'</tr>';
   $('trk-tbl').tBodies[0].innerHTML=rows.map(function(r){var on=TRK.sel.has(r.id);
     return '<tr data-tid="'+r.id+'"'+(on?' class="sel"':'')+'><td class="ck"><input type="checkbox" data-tsel="'+r.id+'" aria-label="Select '+esc(r.ip)+'"'+(on?' checked':'')+'></td>'+
-     '<td><span class="mono">'+esc(r.ip)+'</span></td><td>'+pillSt(r.status)+'</td><td>'+rel(r.lastUpAt,'never')+'</td>'+
+     '<td><span class="mono">'+esc(r.ip)+'</span></td><td>'+pillSt(r.status,r.silent)+'</td><td>'+rel(r.lastUpAt,'never')+'</td>'+
      '<td>'+rel(r.lastAt,'not yet')+(r.lastUp&&r.lastRtt!=null?' <span class="dim mono">'+ms(r.lastRtt)+'</span>':'')+'</td>'+
      '<td class="mono">'+(r.checks?Math.round(r.ups/r.checks*100)+'%':'<span class="dim">–</span>')+'</td><td>'+ticks(r.recent)+'</td>'+
-     '<td>'+esc(r.everyLabel.replace(/^Every /,''))+'</td><td>'+dim(r.host)+'</td><td>'+dim(r.bld)+'</td><td>'+dim(r.room.replace(/^[^·]*· /,''))+'</td>'+
+     '<td>'+esc(r.everyLabel.replace(/^Every /,''))+(r.paced?' <span class="dim">· paced</span>':'')+'</td><td>'+dim(r.scan)+'</td><td>'+dim(r.host)+'</td><td>'+dim(r.bld)+'</td><td>'+dim(r.room.replace(/^[^·]*· /,''))+'</td>'+
      '<td>'+dim(r.owner)+'</td><td>'+dim(r.label)+'</td><td class="mono">'+esc(when(r.addedAt).slice(0,10))+'</td></tr>'}).join('');
-  var e=$('trk-empty');e.hidden=TRK.count>0;e.textContent=TRK.sum.counts.all?'No tracked addresses match.':'Nothing is tracked yet. Add addresses above, or filter the Explorer and click Track these IPs.';
+  var e=$('trk-empty');e.hidden=TRK.count>0;e.textContent=TRK.sum.counts.all?'No tracked addresses match.':'Nothing is tracked yet. Start a scan above, or filter the Explorer and click Track these IPs.';
   var left=TRK.count-rows.length;
   $('trk-pager').innerHTML=left>0?'<span>Showing '+fmt(rows.length)+' of '+fmt(TRK.count)+'</span><button class="btn sm" type="button" data-tpg="1">Show '+fmt(Math.min(PAGE,left))+' more</button><button class="btn sm" type="button" data-tpg="all">Show all</button>':'';
   trkBulk();
@@ -362,8 +410,11 @@ function arm(b,label){
   trkDisarm();TRK.arm=b;b.dataset.txt=b.textContent;b.textContent=label;b.classList.add('armed');
   setTimeout(function(){if(TRK.arm===b)trkDisarm()},4000);return false}
 function trkDisarm(){var b=TRK.arm;TRK.arm=null;if(b&&b.dataset.txt){b.textContent=b.dataset.txt;b.classList.remove('armed')}}
-function addMsg(d){return 'Now tracking '+fmt(d.added)+' new address'+(d.added===1?'':'es')+(d.existing?' ('+fmt(d.existing)+' already tracked)':'')+'.'+(d.added?' The first check runs within a minute.':'')}
-function checkMsg(d){return d.queued!=null?fmt(d.queued)+' addresses queued. They are checked within a minute.':fmt(d.checked)+' checked, '+fmt(d.up)+' answered'}
+function addMsg(d){
+  var j=d.joined||0,x=d.existing||0;
+  return (d.scan?'Scan started: ':'Now tracking ')+fmt(d.added)+' new address'+(d.added===1?'':'es')+(j?', and '+fmt(j)+' you were already tracking joined it':'')+
+   (x?' ('+fmt(x)+(d.scan?' already in other scans':' already tracked')+')':'')+'.'+(d.added||j?' The first checks start within a minute.':'')}
+function checkMsg(d){return d.queued!=null?fmt(d.queued)+' addresses queued. '+(d.paced?'Paced ones are checked one at a time, a random '+gapText()+' apart.':'They are checked within a minute.'):fmt(d.checked)+' checked, '+fmt(d.up)+' answered'}
 function trkDone(msg){toast(msg);return trkLoad(true)}
 function trkBulkAct(b){
   var ids=Array.from(TRK.sel),a=b.dataset.bulk;if(!ids.length)return;
@@ -373,15 +424,36 @@ function trkBulkAct(b){
   var body={ids:ids};if(a==='every')body.every=$('trk-bevery').value;else body.paused=a==='pause';
   send('/api/tracker/targets','PATCH',body).then(function(d){TRK.sel.clear();trkDone((a==='every'?'Interval changed for ':a==='pause'?'Paused ':'Resumed ')+fmt(d.updated)+' addresses')}).catch(fail);
 }
+/* ---- new scan ---- */
+function ipNum(s){var p=s.split('.'),v=0;if(p.length!==4)return -1;for(var i=0;i<4;i++){if(!/^\d{1,3}$/.test(p[i])||+p[i]>255)return -1;v=v*256+(+p[i])}return v}
+/* How many addresses the text names, counted as the server does apart from duplicates. */
+function countIps(text){
+  var n=0;String(text||'').split(/[\s,;]+/).forEach(function(t){var m;
+    if((m=/^(.+)\/(\d+)$/.exec(t))){if(ipNum(m[1])>=0&&+m[2]<=32){var z=Math.pow(2,32-m[2]);n+=z>=4?z-2:z}}
+    else if((m=/^(.+)-(.+)$/.exec(t))){var a=ipNum(m[1]),b=ipNum(m[2]);if(a>=0&&b>=a)n+=b-a+1}
+    else if(t&&ipNum(t)>=0)n++});
+  return n}
+function trkEst(){
+  var n=countIps($('trk-ips').value),el=$('trk-est');
+  if(!n||!TRK.sum){el.innerHTML='';return}
+  var txt=fmt(n)+' address'+(n===1?'':'es');
+  if($('trk-paced').checked&&n>1){
+    var g=TRK.sum.paceGap,avg=(g[0]+g[1])/2,lo=n*avg,every=TRK.sum.intervals.filter(function(i){return i.k===$('trk-every').value})[0].s;
+    txt+=', one at a time: a round takes about '+dur(lo)+' if they all answer, up to '+dur(n*(avg+PROBE_MAX))+' if none do.'+
+     (lo>every?' <b>That is longer than the interval</b>, so each address will be checked less often than you chose.':'');
+  }else txt+='.';
+  el.innerHTML=txt;
+}
 function trkAdd(){
   var ips=$('trk-ips').value.trim();if(!ips){$('trk-ips').focus();return}
   $('trk-go').disabled=true;$('trk-addmsg').textContent='';
-  send('/api/tracker/targets','POST',{ips:ips,every:$('trk-every').value,label:$('trk-label').value}).then(function(d){
-    var bad=d.invalid||[];$('trk-go').disabled=false;$('trk-ips').value='';
+  send('/api/tracker/scans','POST',{ips:ips,name:$('trk-label').value,every:$('trk-every').value,paced:$('trk-paced').checked}).then(function(d){
+    var bad=d.invalid||[];$('trk-go').disabled=false;$('trk-ips').value='';$('trk-label').value='';trkEst();
     $('trk-addmsg').textContent=addMsg(d)+(bad.length?' Skipped, not addresses: '+bad.slice(0,8).join(', ')+(bad.length>8?' and '+fmt(bad.length-8)+' more':'')+'.':'');
     trkLoad(true);
   }).catch(function(e){$('trk-go').disabled=false;$('trk-addmsg').textContent=e.message});
 }
+/* ---- one address ---- */
 function strip(checks,days){
   var by={},out=[],today=new Date();today.setHours(0,0,0,0);
   checks.forEach(function(c){var k=dayKey(new Date(c[0]*1000)),o=by[k]||(by[k]={n:0,u:0});o.n++;o.u+=c[1]});
@@ -391,18 +463,20 @@ function strip(checks,days){
    '<div class="trk-lg"><span><i class="u"></i>Answered</span><span><i class="m"></i>Some checks answered</span><span><i class="d"></i>No answer</span><span><i></i>Not checked</span></div>';
 }
 function trkOpen(id){Promise.all([api('/api/tracker/targets/'+id),trkMeta()]).then(function(x){
-  var d=x[0],t=d.target,ch=d.checks,now=Date.now()/1000,since=t.lastUpAt||t.addedAt;
+  var d=x[0],t=d.target,ch=d.checks,now=Date.now()/1000,ns=t.nextSilent,days=t.silentSince?Math.floor((now-t.silentSince)/86400):0;
   $('dr').innerHTML='<div class="dr-h"><div><h2>'+esc(t.ip)+'</h2><p>'+esc(t.host||t.label||'Not in the Explorer data')+(t.type?' · '+esc(t.type):'')+'</p></div><button class="x" type="button" data-close="dr" aria-label="Close detail">×</button></div>'+
-   '<div class="tags"><span class="tag">'+pillSt(t.status)+'</span><span class="tag">'+esc(t.everyLabel)+'</span>'+(t.checks?'<span class="tag">Answered '+fmt(t.ups)+' of '+fmt(t.checks)+' checks ('+Math.round(t.ups/t.checks*100)+'%)</span>':'')+(t.label?'<span class="tag">'+esc(t.label)+'</span>':'')+'</div>'+
-   (t.status==='unused'?'<div class="warn"><b>Likely unused.</b> It has not answered for '+fmt(Math.floor((now-since)/86400))+' days'+(t.lastUpAt?'':', since tracking started')+'. Check with its owner before you reclaim it.</div>':'')+
+   '<div class="tags"><span class="tag">'+pillSt(t.status,t.silent)+'</span><span class="tag">'+esc(t.everyLabel)+(t.paced?', paced':'')+'</span>'+(t.scan?'<span class="tag">Scan: '+esc(t.scan)+'</span>':'')+(t.checks?'<span class="tag">Answered '+fmt(t.ups)+' of '+fmt(t.checks)+' checks ('+Math.round(t.ups/t.checks*100)+'%)</span>':'')+(t.label?'<span class="tag">'+esc(t.label)+'</span>':'')+'</div>'+
+   (t.silent?'<div class="warn"><b>No reply for '+fmt(days)+' days'+(t.lastUpAt?'':' since tracking started')+'.</b> It may no longer be in use. Check with its owner before you reclaim it.</div>':'')+
    '<div class="sec"><h3>Availability, last '+d.days+' days</h3>'+strip(ch,d.days)+'</div>'+
-   '<div class="sec"><h3>Profile</h3>'+dl([['Tracked since',when(t.addedAt)],
+   '<div class="sec"><h3>Profile</h3>'+dl([['Tracked since',when(t.addedAt)],['Scan',t.scan||'None, tracked on its own'],
      ['Last reply',t.lastUpAt?when(t.lastUpAt)+' ('+ago(t.lastUpAt)+')':'None since tracking started'],
      ['Last check',t.lastAt?when(t.lastAt)+' · '+(t.lastUp?'answered by '+viaText(t.lastVia)+(t.lastRtt!=null?' in '+ms(t.lastRtt):''):'no answer'):'Not checked yet'],
-     ['Next check',t.paused?'Paused':t.nextAt<=now?'Due now':when(t.nextAt)],
-     ['Likely unused from',t.unusedAt?when(t.unusedAt)+', unless it answers before then':'']])+'</div>'+
+     ['Next check',t.paused?'Paused':t.nextAt<=now?(t.paced?'Waiting its turn in the paced checks':'Due now'):when(t.nextAt)],
+     ['No reply for',t.silentSince?fmt(days)+' day'+(days===1?'':'s'):''],
+     [ns?'No reply '+ns.l+' from':'',ns?when(ns.at)+', unless it answers before then':'']])+'</div>'+
    (t.assetId?'<div class="sec"><h3>In the Explorer</h3>'+dl([['Host',t.host],['Building',t.bld],['Room',t.room],['Owner',t.owner],['Device type',t.type],['BlueCat state',t.state],['Coverage',t.cov]])+'</div>':'')+
-   '<div class="sec"><h3>Settings</h3><div class="trk-row"><label>Check <select class="inp sm" data-tset="every">'+everyOpts(everyKey(t.every))+'</select></label><input class="inp sm" type="text" maxlength="200" data-tset="label" aria-label="Label" placeholder="Label" value="'+esc(t.label)+'"></div>'+
+   '<div class="sec"><h3>Settings</h3>'+(t.scan?'<p class="dim trk-note">These change this address only. To change the whole scan, use the Scans table.</p>':'')+
+    '<div class="trk-row"><label>Check <select class="inp sm" data-tset="every">'+everyOpts(everyKey(t.every))+'</select></label><label><input type="checkbox" data-tset="paced"'+(t.paced?' checked':'')+'>Paced</label><input class="inp sm" type="text" maxlength="200" data-tset="label" aria-label="Label" placeholder="Label" value="'+esc(t.label)+'"></div>'+
     '<div class="acts"><button class="btn sm" type="button" data-tact="check">Check now</button><button class="btn sm" type="button" data-tact="'+(t.paused?'resume':'pause')+'">'+(t.paused?'Resume checks':'Pause checks')+'</button>'+(t.assetId?'<button class="btn sm" type="button" data-tact="explore" data-ip="'+esc(t.ip)+'">Open in Explorer</button>':'')+'<button class="btn sm" type="button" data-cp="'+esc(t.ip)+'">Copy IP</button><button class="btn sm danger" type="button" data-tact="remove">Stop tracking</button></div></div>'+
    '<div class="sec"><h3>Recent checks</h3>'+(ch.length?'<div class="trk-log">'+ch.slice(0,50).map(function(c){return '<span class="mono">'+when(c[0])+'</span><span><span class="dot" style="background:var(--t-'+(c[1]?'up':'down')+')"></span> '+(c[1]?'Answered':'No answer')+'</span><span class="dim">'+(c[1]?esc(viaText(c[3]))+(c[2]!=null?' · '+ms(c[2]):''):'')+'</span>'}).join('')+'</div>':'<span class="dim">Not checked yet. The first check runs within a minute.</span>')+'</div>';
   $('dr').hidden=false;$('ovl').hidden=false;$('dr').scrollTop=0;$('dr').dataset.tid=id;delete $('dr').dataset.asset;
@@ -417,12 +491,12 @@ function trkAct(b){
   send('/api/tracker/targets','PATCH',{ids:[id],paused:a==='pause'}).then(function(){toast(a==='pause'?'Checks paused':'Checks resumed');trkOpen(id);trkLoad(true)}).catch(fail);
 }
 function trkSet(el){
-  var id=+$('dr').dataset.tid,body={ids:[id]};body[el.dataset.tset]=el.value;
+  var id=+$('dr').dataset.tid,body={ids:[id]};body[el.dataset.tset]=el.type==='checkbox'?el.checked:el.value;
   send('/api/tracker/targets','PATCH',body).then(function(){toast('Saved');trkOpen(id);trkLoad(true)}).catch(fail)}
 /* The tracker block in the Explorer's asset drawer. */
 function trkAssetSec(r,tr){
   if(!TRK.sum)return '';
-  if(tr)return '<div class="sec"><h3>IP tracker</h3><div class="trk-row">'+pillSt(tr.status)+'<span class="dim">'+esc(tr.everyLabel)+' · last reply '+(tr.lastUpAt?ago(tr.lastUpAt):'none yet')+'</span><button class="btn sm" type="button" data-topen="'+tr.id+'">Open in Tracker</button></div></div>';
+  if(tr)return '<div class="sec"><h3>IP tracker</h3><div class="trk-row">'+pillSt(tr.status,tr.silent)+'<span class="dim">'+esc(tr.everyLabel)+' · last reply '+(tr.lastUpAt?ago(tr.lastUpAt):'none yet')+'</span><button class="btn sm" type="button" data-topen="'+tr.id+'">Open in Tracker</button></div></div>';
   if(!/^\d+\.\d+\.\d+\.\d+$/.test(r.ip))return '';
   return '<div class="sec"><h3>IP tracker</h3><div class="trk-row"><span class="dim">Not tracked.</span><select class="inp sm" id="dr-every" aria-label="How often to check">'+everyOpts(TRK.sum.defaultEvery)+'</select><button class="btn sm" type="button" data-track="'+esc(r.ip)+'">Track this IP</button></div></div>';
 }
@@ -430,13 +504,14 @@ function trkOne(b){
   var id=+$('dr').dataset.asset;b.disabled=true;
   send('/api/tracker/targets','POST',{ips:b.dataset.track,every:$('dr-every').value}).then(function(d){toast(d.added?'Tracking '+b.dataset.track+'. The first check runs within a minute.':'Already tracked');openDrawer(id)}).catch(function(e){b.disabled=false;fail(e)})}
 function trkAllOpen(){trkMeta().then(function(s){
-  $('trkdlg-b').innerHTML='<p>Track the IP address of each of the <b>'+fmt(COUNT)+'</b> assets that match the current search and filters. Addresses that are already tracked keep their settings.</p>'+
-   '<div class="trk-row"><label>Check <select class="inp" id="trkdlg-every">'+everyOpts(s.defaultEvery)+'</select></label><input class="inp" id="trkdlg-label" type="text" maxlength="200" aria-label="Label" placeholder="Label (optional)"></div><p class="err" id="trkdlg-msg"></p>';
+  $('trkdlg-b').innerHTML='<p>Start a scan of the IP address of each of the <b>'+fmt(COUNT)+'</b> assets that match the current search and filters. Addresses you track on their own join the scan; addresses in another scan stay there.</p>'+
+   '<div class="trk-row"><input class="inp" id="trkdlg-label" type="text" maxlength="200" aria-label="Scan name" placeholder="Scan name (optional)"><label>Check <select class="inp" id="trkdlg-every">'+everyOpts(s.defaultEvery)+'</select></label></div>'+
+   '<div class="trk-row"><label><input type="checkbox" id="trkdlg-paced"><span>Pace the checks: one address at a time, a random '+gapText()+' apart</span></label></div><p class="err" id="trkdlg-msg"></p>';
   $('trkdlg-go').disabled=!COUNT;$('trkdlg').hidden=false;$('ovl').hidden=false;
 }).catch(fail)}
 function trkAllGo(){
   $('trkdlg-go').disabled=true;
-  send('/api/tracker/from-explorer?'+params(),'POST',{every:$('trkdlg-every').value,label:$('trkdlg-label').value})
+  send('/api/tracker/from-explorer?'+params(),'POST',{every:$('trkdlg-every').value,name:$('trkdlg-label').value,paced:$('trkdlg-paced').checked})
    .then(function(d){$('trkdlg-go').disabled=false;closeAll();toast(addMsg(d))})
    .catch(function(e){$('trkdlg-go').disabled=false;$('trkdlg-msg').textContent=e.message});
 }
@@ -463,6 +538,8 @@ document.addEventListener('click',function(e){
   var t=e.target;
   var sc=t.closest('[data-sect]');if(sc){if(sc.dataset.sect!==SECTION)showSection(sc.dataset.sect);return}
   var bk=t.closest('[data-bucket]');if(bk){TRK.bucket=bk.dataset.bucket;TRK.shown=PAGE;trkLoad();return}
+  var sb=t.closest('[data-sb]');if(sb){trkScanFilter(sb);return}
+  var sa=t.closest('[data-sact]');if(sa){trkScanAct(sa);return}
   var ts=t.closest('th[data-ts]');if(ts){var tk=ts.dataset.ts;if(TRK.sort.k===tk)TRK.sort.d=-TRK.sort.d;else TRK.sort={k:tk,d:1};trkLoad();return}
   var ck=t.closest('.ck');if(ck){if(t.tagName!=='INPUT')ck.querySelector('input').click();return}
   var ttr=t.closest('tr[data-tid]');if(ttr){trkOpen(+ttr.dataset.tid);return}
@@ -497,6 +574,7 @@ var FT={};
 document.addEventListener('input',function(e){
   var t=e.target;
   if(t.matches('[data-fs]')){var k=t.dataset.fs;FQ[k]=t.value;clearTimeout(FT[k]);FT[k]=setTimeout(function(){loadFacet(k)},150);return}
+  if(t.id==='trk-ips'){trkEst();return}
   if(t.id==='trk-q'){clearTimeout(FT.__trk);FT.__trk=setTimeout(function(){TRK.q=t.value.trim();TRK.shown=PAGE;trkLoad()},200)}});
 document.addEventListener('change',function(e){
   var t=e.target;
@@ -504,6 +582,9 @@ document.addEventListener('change',function(e){
   if(t.matches('[data-map]')){setMap(t.dataset.map,+t.value);return}
   if(t.matches('[data-tsel]')){trkSelect(t);return}
   if(t.matches('[data-tset]')){trkSet(t);return}
+  if(t.matches('[data-sset]')){trkScanSet(t);return}
+  if(t.id==='trk-scan'){TRK.scan=t.value;TRK.shown=PAGE;trkLoad();return}
+  if(t.id==='trk-every'||t.id==='trk-paced'){trkEst();return}
   if(t.id==='f-rz'){takeFile('rz',t.files[0]);return}
   if(t.id==='f-bc'){takeFile('bc',t.files[0])}});
 ['dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){var z=e.target.closest&&e.target.closest('.dz');if(!z)return;e.preventDefault();

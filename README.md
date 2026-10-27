@@ -53,22 +53,34 @@ Owner and Room come from BlueCat user-defined fields named `Owner` and `Room`. I
 
 ## IP Tracker
 
-The **IP Tracker** section (next to **Explorer** at the top) checks addresses on a schedule to see whether they are still in use. Add addresses in any of these ways:
+The **IP Tracker** section (next to **Explorer** at the top) checks addresses on a schedule to see whether they are still in use.
 
-- Type or paste them on the Tracker page: single IPs, CIDR blocks (`130.113.10.0/24`) or ranges (`130.113.10.5-130.113.10.40`). Blocks skip their network and broadcast addresses. You can add up to 10,000 at a time.
-- In the Explorer, filter to the assets you want, for example `cov:"BlueCat only"`, and click **Track these IPs**.
-- Click **Track this IP** in an asset's detail panel.
+### Start a scan
 
-Each address is checked on the interval you pick: every 4, 8 or 12 hours, every day, every 3 days, every month (30 days) or every 2 months (60 days). A check pings the address with [fping](https://fping.org/). If there is no answer, it tries a TCP connection to ports 80, 443, 22, 445 and 3389. A connection or a refusal both count as alive, as with `nmap -sn`. Click an address to see its profile: uptime, last reply, a 180-day availability strip and recent checks.
+Under **New scan**, enter a CIDR block (`130.113.10.0/24`), a range (`130.113.10.5-130.113.10.40`) or single IPs, separated by spaces or new lines. Blocks skip their network and broadcast addresses. A scan can have up to 10,000 addresses. Then choose:
 
-An address goes into the **Likely unused** bucket after 90 days without a reply. That means it hasn't answered since tracking started, or since its last reply. **Download CSV** exports any bucket.
+- **Check**: every 4, 8 or 12 hours, every day, every 3 days, every month (30 days) or every 2 months (60 days).
+- **Pace the checks**: check one address at a time, with a random pause of 0.5 to 4 seconds between addresses, instead of checking them all at once. Use it when you don't want a burst of traffic, for example on a network that an intrusion detection system watches. A paced /24 takes about 10 minutes per round if every address answers and about 40 if none do. The form shows an estimate, and warns you when a round would take longer than the interval. Paced checks from all scans share one queue.
+
+You can also start a scan from the Explorer: filter to the assets you want, for example `cov:"BlueCat only"`, and click **Track these IPs**. To track a single address on its own, click **Track this IP** in an asset's detail panel.
+
+The **Scans** table lists each scan with its counts: how many addresses answered, how many didn't, and how many are in each no-reply bucket. Click a number to list those addresses. From the table you can change a scan's interval or pacing, check it now, pause it, or remove it with its history. An address belongs to one scan at most. If a new scan includes addresses you track on their own, they join it and take its settings. Addresses that are already in another scan stay there. Removing a scan stops tracking all of its addresses, including ones that joined it.
+
+### How an address is checked
+
+A check pings the address with [fping](https://fping.org/). If there is no answer, it tries a TCP connection to ports 80, 443, 22, 445 and 3389. A connection or a refusal both count as alive, as with `nmap -sn`. Click an address to see its profile: uptime, last reply, a 180-day availability strip and recent checks.
+
+### No-reply buckets
+
+An address that doesn't answer is counted from its last reply, or from when tracking started if it has never answered. The **No reply for** tiles sort these addresses into buckets: 30+ days, 60+ days, 90+ days, 6+ months (180 days) and 12+ months (365 days). The buckets overlap: an address with no reply for 100 days is in the 30+, 60+ and 90+ day buckets. The tiles and the address list follow the scan and search you choose. **Download CSV** exports the list, including how many days each address has gone without a reply.
+
+### Background checks
 
 Checks run in the background for as long as the container runs. Tracked addresses and their history are kept in the same Docker volume as your uploads, so they survive restarts, and checks pick up where they left off.
 
 | Environment variable | What it does |
 |---|---|
 | `TRACKER=off` | Don't run checks |
-| `TRACKER_UNUSED_DAYS=90` | Days without a reply before an address counts as likely unused |
 | `TRACKER_TCP_PORTS=80,443,22,445,3389` | Ports tried when an address doesn't answer ping. Leave empty to use ping only |
 
 Things to know:

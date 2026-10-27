@@ -65,7 +65,7 @@ def has_targets(db):
         return False
 
 
-TABLES = ['track_checks', 'track_targets', 'tracker_state',
+TABLES = ['track_checks', 'track_targets', 'track_scans', 'tracker_state',
           'runzero_rows', 'bluecat_rows', 'source_files', 'asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
 # Rebuilt from the source files on every import.
 MERGED_TABLES = ['asset_facets', 'asset_search', 'asset_ips', 'assets', 'meta']
@@ -78,12 +78,22 @@ def _build_version(db):
     return db.execute('PRAGMA user_version').fetchone()[0]
 
 
+def migrate(db):
+    """Add the columns that newer versions gave tables an older version created. Runs before
+    schema.sql, whose indexes use them."""
+    cols = {r['name'] for r in db.execute('PRAGMA table_info(track_targets)')}
+    if cols and 'scan_id' not in cols:
+        db.execute('ALTER TABLE track_targets ADD COLUMN scan_id INTEGER REFERENCES track_scans (id) ON DELETE CASCADE')
+        db.execute('ALTER TABLE track_targets ADD COLUMN paced INTEGER NOT NULL DEFAULT 0')
+
+
 def init_schema(db, reset=False):
     """Create any missing tables; with reset, drop everything first. A database built by another
     version keeps its source files and has its merged tables recreated and rebuilt."""
     if reset or _build_version(db) != BUILD_VERSION:
         for t in TABLES if reset else MERGED_TABLES:
             db.execute(f'DROP TABLE IF EXISTS {t}')
+    migrate(db)
     with current_app.open_resource('schema.sql') as f:
         db.executescript(f.read().decode('utf-8'))
     db.execute('PRAGMA journal_mode = WAL')
