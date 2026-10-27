@@ -1,6 +1,6 @@
 # IP Asset Explorer
 
-IP Asset Explorer merges McMaster's BlueCat IPAM export with runZero scan results so you can search and filter every address by building, room, owner, device type, risk, open ports and more. It is a Flask app with a SQLite database and runs in Docker.
+IP Asset Explorer merges BlueCat IPAM export with runZero scan results so you can search and filter every address by building, room, owner, device type, risk, open ports and more. It is a Flask app with a SQLite database and runs in Docker.
 
 ## Install and run
 
@@ -46,7 +46,7 @@ It asks for anything you didn't set, and for your password unless you set `BAM_P
 |---|---|
 | `--block 172.30.0.0/16` | Export one block only. Good for a first test run |
 | `--no-hosts` | Skip the host name lookups. Much faster, but the Host Name column is empty |
-| `--config NAME` | BlueCat configuration to read. Default: `McMaster` |
+| `--config NAME` | BlueCat configuration to read. Default: `<institution name>` |
 | `--out PATH` | Where to write the CSV. Default: `bluecat_allocated_ips_<date>.csv` in the current folder |
 
 Owner and Room come from BlueCat user-defined fields named `Owner` and `Room`. If yours are named differently, change `UDF_OWNER` and `UDF_ROOM` at the top of the script.
@@ -110,11 +110,11 @@ Without fping installed, the tracker uses only the TCP check.
 
 Developing against real data is optional. `init-db --bluecat PATH --runzero PATH` loads exports from anywhere on disk as built-in data. The import dialog's **Go back to the built-in** button then returns to them.
 
-The tests use small synthetic files in `tests/fixtures/`. `tests/test_parity.py` compares the Python version with the original single-file `IP Asset Explorer_McMaster_2026.html` on your real exports. It runs the original JavaScript in Node and skips unless you point it at the files:
+The tests use small synthetic files in `tests/fixtures/`. `tests/test_parity.py` compares the Python version with the original single-file `IP Asset Explorer_uni_2026.html` on your real exports. It runs the original JavaScript in Node and skips unless you point it at the files:
 
 ```sh
 IPX_BLUECAT_CSV=/path/to/bluecat.csv IPX_RUNZERO_CSV=/path/to/runzero.csv \
-IPX_ORIGINAL_HTML="/path/to/IP Asset Explorer_McMaster_2026.html" .venv/bin/pytest tests/test_parity.py
+IPX_ORIGINAL_HTML="/path/to/IP Asset Explorer_uni_2026.html" .venv/bin/pytest tests/test_parity.py
 ```
 
 Its intermediate output goes to a temporary folder that is deleted afterwards. The explorer now matches on every address of a runZero asset (`address`, `addresses_scope` and `addresses_extra`), which the original did not, so the test ignores those additions; its docstring lists where results still differ by design.
