@@ -275,9 +275,6 @@ details summary{cursor:pointer;color:var(--accent);padding:4px 0}
   #vtable .tw{flex:1 1 0;min-height:0;max-height:none}
   #vtable .pager{flex:none;padding-bottom:0}
   #vloc:not([hidden]){flex:1 1 0;min-height:240px;overflow:auto}
-  /* With charts showing there is no room left for the table, so it gets the full column height
-     below them (--fullH is measured in app.js) and the column scrolls past the charts to it. */
-  .main.with-charts #vtable:not([hidden]),.main.with-charts #vloc:not([hidden]){flex:none;height:var(--fullH,600px)}
 }
 
 /* IP tracker. Status colours follow the theme through the tokens they point at. */
@@ -363,8 +360,21 @@ input.inp{width:220px;max-width:100%}
 .trk-log{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:3px 14px;font-size:12.5px;max-height:280px;overflow:auto}
 .trk-log .dot{width:8px;height:8px}
 .dr .warn{margin-top:10px}
+/* New scan sits behind a button next to the status line. */
+.trk-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.trk-st{flex:1;min-width:0}
+.trk-head .btn{flex:none}
+/* Desktop: like the Explorer, the page itself never scrolls. The summary above the list keeps its size
+   and the tracked addresses take the rest of the height and scroll inside their own box. The scans
+   table is capped and scrolls too. On a window too short for even a small list, the tracker scrolls
+   rather than squeezing the list away. */
 @media (min-width:981px){
-  .trk:not([hidden]){flex:1;min-height:0;overflow:auto}
+  .trk:not([hidden]){flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+  .trk>*{flex:none}
+  .trk .vbar{margin-top:12px}
+  .trk-scans .tw{max-height:152px}
+  .trk>.trk-main{flex:1 1 0;min-height:200px;max-height:none}
+  .trk>.pager{padding-block:8px 0}
 }
 @media (max-width:640px){
   .trk-search{flex:1 1 100%}

@@ -99,7 +99,6 @@ function stackBar(fk,items,colorOf){
   return '<div class="stk">'+items.map(function(i){return '<button type="button" aria-pressed="'+SEL[fk].has(i[0])+'" data-f="'+fk+'" data-v="'+esc(i[0])+'" title="'+esc(i[0])+': '+i[1]+'" style="background:var('+colorOf(i[0])+');flex:'+i[1]+' 1 0"></button>'}).join('')+'</div>'+
   '<div class="lg">'+items.map(function(i){return '<button type="button" data-f="'+fk+'" data-v="'+esc(i[0])+'"><span class="dot" style="background:var('+colorOf(i[0])+')"></span>'+esc(i[0])+' <b class="mono">'+fmt(i[1])+'</b></button>'}).join('')+'</div>'}
 function renderCharts(c){
-  $('main').classList.toggle('with-charts',!!(SHOWCH&&c));
   if(!SHOWCH||!c){$('charts').hidden=true;return}$('charts').hidden=false;
   var mx=Math.max.apply(null,c.months.map(function(m){return m[1]}).concat([1]));
   var mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -156,9 +155,7 @@ function loadFacet(k){
   api('/api/facets/'+encodeURIComponent(k)+'?'+params()).then(function(d){if(my!==FSEQ[k])return;FACETS[k]=d;renderFacetList(FK[k])}).catch(fail);
 }
 function setTop(){
-  var r=document.documentElement.style,vb=document.querySelector('.vbar'),cs=getComputedStyle(vb);
-  r.setProperty('--topH',$('top').offsetHeight+'px');
-  r.setProperty('--fullH',Math.max(300,$('main').clientHeight-vb.offsetHeight-parseFloat(cs.marginTop)-parseFloat(cs.marginBottom))+'px');
+  document.documentElement.style.setProperty('--topH',$('top').offsetHeight+'px');
 }
 function toggleSel(k,v){var s=SEL[k];s.has(v)?s.delete(v):s.add(v);SHOWN=PAGE;render()}
 
@@ -486,12 +483,19 @@ function trkEst(){
   }else txt+='.';
   el.innerHTML=txt;
 }
+/* The new scan form stays folded away until asked for, so the address list keeps the room. */
+function trkAddOpen(on){
+  $('trk-add').hidden=!on;$('trk-addtog').setAttribute('aria-expanded',String(on));
+  if(on){$('trk-addmsg').textContent='';$('trk-ips').focus()}
+}
 function trkAdd(){
   var ips=$('trk-ips').value.trim();if(!ips){$('trk-ips').focus();return}
   $('trk-go').disabled=true;$('trk-addmsg').textContent='';
   send('/api/tracker/scans','POST',{ips:ips,name:$('trk-label').value,every:$('trk-every').value,paced:$('trk-paced').checked}).then(function(d){
     var bad=d.invalid||[];$('trk-go').disabled=false;$('trk-ips').value='';$('trk-label').value='';trkEst();
-    $('trk-addmsg').textContent=addMsg(d)+(bad.length?' Skipped, not addresses: '+bad.slice(0,8).join(', ')+(bad.length>8?' and '+fmt(bad.length-8)+' more':'')+'.':'');
+    var msg=addMsg(d);
+    if(bad.length)$('trk-addmsg').textContent=msg+' Skipped, not addresses: '+bad.slice(0,8).join(', ')+(bad.length>8?' and '+fmt(bad.length-8)+' more':'')+'.';
+    else{trkAddOpen(false);toast(msg)}
     trkLoad(true);
   }).catch(function(e){$('trk-go').disabled=false;$('trk-addmsg').textContent=e.message});
 }
@@ -646,6 +650,7 @@ $('download').addEventListener('click',downloadCsv);
 $('trkall').addEventListener('click',trkAllOpen);
 $('trkdlg-go').addEventListener('click',trkAllGo);
 $('trk-go').addEventListener('click',trkAdd);
+$('trk-addtog').addEventListener('click',function(){trkAddOpen($('trk-add').hidden)});
 $('trk-dl').addEventListener('click',function(){location.href='/api/tracker/export.csv?'+trkParams({download:1})});
 $('colbtn').addEventListener('click',function(e){e.stopPropagation();colMenu()});
 $('dens').addEventListener('click',function(){var on=$('dens').getAttribute('aria-pressed')!=='true';$('dens').setAttribute('aria-pressed',String(on));$('tbl').classList.toggle('dense',on)});

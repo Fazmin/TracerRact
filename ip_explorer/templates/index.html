@@ -60,8 +60,11 @@
 </div>
 
 <div class="trk" id="trk" hidden>
-  <div class="trk-st" id="trk-st"></div>
-  <section class="card trk-add" aria-labelledby="trk-add-t">
+  <div class="trk-head">
+    <div class="trk-st" id="trk-st"></div>
+    <button class="btn primary" id="trk-addtog" type="button" aria-expanded="false" aria-controls="trk-add">New scan</button>
+  </div>
+  <section class="card trk-add" id="trk-add" aria-labelledby="trk-add-t" hidden>
     <h3 id="trk-add-t">New scan</h3>
     <p>Enter a CIDR block such as <code>130.113.10.0/24</code>, a range such as <code>130.113.10.5-130.113.10.40</code> or single IP addresses, separated by spaces or new lines. Every address in the scan is checked on its schedule, and the tracker records whether it answered. You can also filter the Explorer and click <b>Track these IPs</b>.</p>
     <textarea id="trk-ips" rows="2" aria-label="Addresses to scan" placeholder="130.113.10.0/24  130.113.12.5-130.113.12.40"></textarea>
@@ -85,7 +88,7 @@
     <div class="trk-bulk" id="trk-bulk" hidden><b id="trk-nsel"></b><select class="inp sm" id="trk-bevery" aria-label="Interval for the selected addresses"></select><button class="btn sm" type="button" data-bulk="every">Set interval</button><button class="btn sm" type="button" data-bulk="check">Check now</button><button class="btn sm" type="button" data-bulk="pause">Pause</button><button class="btn sm" type="button" data-bulk="resume">Resume</button><button class="btn sm danger" type="button" data-bulk="remove">Stop tracking</button></div>
     <button class="btn sm" id="trk-dl" type="button">Download CSV</button>
   </div>
-  <div class="tw"><table id="trk-tbl"><thead></thead><tbody></tbody></table><div class="empty" id="trk-empty" hidden></div></div>
+  <div class="tw trk-main"><table id="trk-tbl"><thead></thead><tbody></tbody></table><div class="empty" id="trk-empty" hidden></div></div>
   <div class="pager" id="trk-pager"></div>
 </div>
 
