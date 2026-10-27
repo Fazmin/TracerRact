@@ -19,7 +19,9 @@ The first time, Asset Tracer is empty. Click **Load runZero / BlueCat file** to 
 
 | Command | What it does |
 |---|---|
-| `./start.sh --port 9090` | Use another port |
+| `git clone https://github.com/Fazmin/TracerRact.git` | Clone the repo |
+| `./start.sh` | Starts the app on the default 8080 |
+| `./start.sh --port 9090` | Use another port (example using 9090) |
 | `./start.sh --lan` | Let other computers on your network open it; prints your LAN address |
 | `./start.sh --reset` | Delete all uploaded data and start again empty |
 | `./start.sh --no-open` | Don't open a browser |
